@@ -105,7 +105,6 @@ class Bridge24:
         v1 = src_loop_vert.co if isinstance(src_loop_vert, bmesh.types.BMVert) else src_loop_vert
         v2 = dest_loop_vert.co if isinstance(dest_loop_vert, bmesh.types.BMVert) else dest_loop_vert
         length = (v1 - v2).length
-        # return length / (2 ** (steps - current_step + 1))
         return length / (2 ** (current_step + 1) - 1)
 
     @staticmethod
