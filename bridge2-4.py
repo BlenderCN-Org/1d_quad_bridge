@@ -64,7 +64,7 @@ class Bridge24:
         prev_block = None
         for i in range(int((len(src_loop) - 1) / 2)):
             print(i)
-            prev_block = __class__.block(src_loop[i * 2 - 1:], dest_loop[i * 4 - 1:], prev_block, final)
+            prev_block = __class__.block(src_loop[i * 2:], dest_loop[i * 4:], prev_block, final)
             print(prev_block)
 
 
