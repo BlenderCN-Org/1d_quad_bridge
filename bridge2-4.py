@@ -46,7 +46,7 @@ class Bridge24:
                 print('total steps:', steps)
                 for step in range(steps):
                     print('current step: ', step)
-                    __class__.build_step(src_loop, dest_loop, final=(step + 1 == steps))
+                    __class__.build_step(src_loop, dest_loop, step, final=(step + 1 == steps))
 
 
 
@@ -60,20 +60,20 @@ class Bridge24:
             return math.floor((len(loop2) - 1) / ((len(loop1) - 1) * 2))
 
     @staticmethod
-    def build_step(src_loop, dest_loop, final=False):
+    def build_step(src_loop, dest_loop, current_step, final=False):
         prev_block = None
         for i in range(int((len(src_loop) - 1) / 2)):
             print(i)
-            prev_block = __class__.block(src_loop[i * 2:], dest_loop[i * 4:], prev_block, final)
+            prev_block = __class__.block(src_loop[i * 2:], dest_loop[i * 4:], prev_block, current_step, final)
             print(prev_block)
 
 
     @staticmethod
-    def block(src_loop, dest_loop, prev_block, final_step=False):
+    def block(src_loop, dest_loop, prev_block, current_step, final_step=False):
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop),
-                __class__.v3(src_loop),
+                __class__.v3(src_loop, dest_loop, prev_block, current_step),
                 __class__.v4(src_loop),
                 __class__.v5(src_loop),
                 __class__.v6(src_loop),
@@ -97,8 +97,12 @@ class Bridge24:
         return src_loop[2]
 
     @staticmethod
-    def v3(src_loop):
-        return src_loop[2]
+    def v3(src_loop, dest_loop, prev_block, current_step):
+        if prev_block:
+            return prev_block[7]
+        else:
+            length = (src_loop[0].co - dest_loop[0].co).length / (2 ** (current_step + 1)) / 2
+            return src_loop[0].co + (dest_loop[0].co - src_loop[0].co) * length
 
     @staticmethod
     def v4(src_loop):
