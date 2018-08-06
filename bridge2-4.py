@@ -46,11 +46,11 @@ class Bridge24:
                 print('total steps:', steps)
                 for step in range(steps):
                     print('current step: ', step)
-                    __class__.build_step(src_loop, dest_loop, step, steps)
+                    __class__.build_step(bm, src_loop, dest_loop, step, steps)
 
 
 
-
+        bm.to_mesh(context.object.data)
         bm.free()
         bpy.ops.object.mode_set(mode='EDIT')
 
@@ -60,12 +60,19 @@ class Bridge24:
             return math.floor((len(loop2) - 1) / ((len(loop1) - 1) * 2))
 
     @staticmethod
-    def build_step(src_loop, dest_loop, current_step, steps):
+    def build_step(bm, src_loop, dest_loop, current_step, steps):
         prev_block = None
         for i in range(int((len(src_loop) - 1) / 2)):
             print(i)
             prev_block = __class__.block(src_loop[i * 2:], dest_loop[i * 4:], prev_block, current_step, steps)
-            print(prev_block)
+            print('block, ', prev_block)
+            # build block from verts
+            bm_verts = []
+            for vert in prev_block:
+                if vert:
+                    bm_vert = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
+                    bm_verts.append(bm_vert)
+            bm.faces.new([bm_verts[0], bm_verts[3], bm_verts[4], bm_verts[1]])
 
 
     @staticmethod
@@ -120,35 +127,35 @@ class Bridge24:
 
     @staticmethod
     def v5(src_loop):
-        return src_loop[2]
+        return None
 
     @staticmethod
     def v6(src_loop):
-        return src_loop[2]
+        return None
 
     @staticmethod
     def v7(src_loop):
-        return src_loop[2]
+        return None
 
     @staticmethod
     def v8(src_loop):
-        return src_loop[2]
+        return None
 
     @staticmethod
     def v9(src_loop):
-        return src_loop[2]
+        return None
 
     @staticmethod
     def v10(src_loop):
-        return src_loop[2]
+        return None
 
     @staticmethod
     def v11(src_loop):
-        return src_loop[2]
+        return None
 
     @staticmethod
     def v12(src_loop):
-        return src_loop[2]
+        return None
 
 
 
