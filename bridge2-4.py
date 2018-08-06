@@ -46,7 +46,7 @@ class Bridge24:
                 print('total steps:', steps)
                 for step in range(steps):
                     print('current step: ', step)
-                    __class__.build_step(src_loop, dest_loop, step, final=(step + 1 == steps))
+                    __class__.build_step(src_loop, dest_loop, step, steps)
 
 
 
@@ -60,21 +60,21 @@ class Bridge24:
             return math.floor((len(loop2) - 1) / ((len(loop1) - 1) * 2))
 
     @staticmethod
-    def build_step(src_loop, dest_loop, current_step, final=False):
+    def build_step(src_loop, dest_loop, current_step, steps):
         prev_block = None
         for i in range(int((len(src_loop) - 1) / 2)):
             print(i)
-            prev_block = __class__.block(src_loop[i * 2:], dest_loop[i * 4:], prev_block, current_step, final)
+            prev_block = __class__.block(src_loop[i * 2:], dest_loop[i * 4:], prev_block, current_step, steps)
             print(prev_block)
 
 
     @staticmethod
-    def block(src_loop, dest_loop, prev_block, current_step, final_step=False):
+    def block(src_loop, dest_loop, prev_block, current_step, steps):
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop),
                 __class__.v3(src_loop, dest_loop, prev_block, current_step),
-                __class__.v4(src_loop),
+                __class__.v4(src_loop, dest_loop, current_step, steps),
                 __class__.v5(src_loop),
                 __class__.v6(src_loop),
                 __class__.v7(src_loop),
@@ -83,6 +83,12 @@ class Bridge24:
                 __class__.v10(src_loop),
                 __class__.v11(src_loop),
                 __class__.v12(src_loop)]
+
+    @staticmethod
+    def block_height(src_loop_vert, dest_loop_vert, current_step):
+        v1 = src_loop_vert.co if isinstance(src_loop_vert, bmesh.types.BMVert) else src_loop_vert
+        v2 = dest_loop_vert.co if isinstance(dest_loop_vert, bmesh.types.BMVert) else dest_loop_vert
+        return (v1 - v2).length / (2 ** (current_step + 1))
 
     @staticmethod
     def v0(src_loop):
@@ -101,12 +107,16 @@ class Bridge24:
         if prev_block:
             return prev_block[7]
         else:
-            length = (src_loop[0].co - dest_loop[0].co).length / (2 ** (current_step + 1)) / 2
+            length = __class__.block_height(src_loop[0], dest_loop[0], current_step) / 2
             return src_loop[0].co + (dest_loop[0].co - src_loop[0].co) * length
 
     @staticmethod
-    def v4(src_loop):
-        return src_loop[2]
+    def v4(src_loop, dest_loop, current_step, steps):
+        v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) / 2
+        v2 = dest_loop[int((2 ** (steps + 1)) / 4)].co
+        direction = v2 - v1
+        length = __class__.block_height(src_loop[0], dest_loop[0], current_step) / 2
+        return v1 + direction * length
 
     @staticmethod
     def v5(src_loop):
