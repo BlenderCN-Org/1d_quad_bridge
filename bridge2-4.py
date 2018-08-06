@@ -88,7 +88,7 @@ class Bridge24:
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop),
-                __class__.v3(src_loop, dest_loop, prev_block, current_step),
+                __class__.v3(src_loop, dest_loop, prev_block, current_step, steps),
                 __class__.v4(src_loop, dest_loop, current_step, steps),
                 __class__.v5(src_loop, dest_loop, current_step, steps),
                 __class__.v6(src_loop, dest_loop, current_step, steps),
@@ -101,10 +101,12 @@ class Bridge24:
                 ]
 
     @staticmethod
-    def block_height(src_loop_vert, dest_loop_vert, current_step):
+    def block_height(src_loop_vert, dest_loop_vert, current_step, steps):
         v1 = src_loop_vert.co if isinstance(src_loop_vert, bmesh.types.BMVert) else src_loop_vert
         v2 = dest_loop_vert.co if isinstance(dest_loop_vert, bmesh.types.BMVert) else dest_loop_vert
-        return (v1 - v2).length / (2 ** (current_step + 1))
+        length = (v1 - v2).length
+        # return length / (2 ** (steps - current_step + 1))
+        return length / (2 ** (current_step + 1) - 1)
 
     @staticmethod
     def v0(src_loop):
@@ -119,12 +121,13 @@ class Bridge24:
         return src_loop[2]
 
     @staticmethod
-    def v3(src_loop, dest_loop, prev_block, current_step):
+    def v3(src_loop, dest_loop, prev_block, current_step, steps):
         if prev_block:
             return prev_block[7]
         else:
             direction = dest_loop[0].co - src_loop[0].co
-            length = __class__.block_height(src_loop[0], dest_loop[0], current_step) / 2
+            direction.normalize()
+            length = __class__.block_height(src_loop[0], dest_loop[0], current_step, steps) / 2
             return src_loop[0].co + direction * length
 
     @staticmethod
@@ -132,7 +135,8 @@ class Bridge24:
         v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) / 2
         v2 = dest_loop[int((2 ** (steps + 1)) / 4)].co
         direction = v2 - v1
-        length = __class__.block_height(v1, v2, current_step) / 2
+        direction.normalize()
+        length = __class__.block_height(v1, v2, current_step, steps) / 2
         return v1 + direction * length
 
     @staticmethod
@@ -140,7 +144,8 @@ class Bridge24:
         v1 = src_loop[1].co
         v2 = dest_loop[int((2 ** (steps + 1)) / 2)].co
         direction = v2 - v1
-        length = __class__.block_height(v1, v2, current_step) * 3 / 4
+        direction.normalize()
+        length = __class__.block_height(v1, v2, current_step, steps) * 3 / 4
         return src_loop[1].co + direction * length
 
     @staticmethod
@@ -148,7 +153,8 @@ class Bridge24:
         v1 = src_loop[1].co + (src_loop[2].co - src_loop[1].co) / 2
         v2 = dest_loop[int((2 ** (steps + 1)) * 3 / 4)].co
         direction = v2 - v1
-        length = __class__.block_height(v1, v2, current_step) / 2
+        direction.normalize()
+        length = __class__.block_height(v1, v2, current_step, steps) / 2
         return v1 + direction * length
 
     @staticmethod
@@ -156,7 +162,8 @@ class Bridge24:
         v1 = src_loop[2].co
         v2 = dest_loop[2 ** (steps + 1)].co
         direction = v2 - v1
-        length = __class__.block_height(src_loop[0], dest_loop[0], current_step) / 2
+        direction.normalize()
+        length = __class__.block_height(src_loop[0], dest_loop[0], current_step, steps) / 2
         return src_loop[2].co + direction * length
 
     @staticmethod
@@ -167,7 +174,8 @@ class Bridge24:
             v1 = src_loop[0].co
             v2 = dest_loop[0].co
             direction = v2 - v1
-            length = __class__.block_height(src_loop[0], dest_loop[0], current_step)
+            direction.normalize()
+            length = __class__.block_height(src_loop[0], dest_loop[0], current_step, steps)
             return src_loop[0].co + direction * length
 
     @staticmethod
@@ -178,7 +186,8 @@ class Bridge24:
             v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) / 2
             v2 = dest_loop[int((2 ** (steps + 1)) / 4)].co
             direction = v2 - v1
-            length = __class__.block_height(v1, v2, current_step)
+            direction.normalize()
+            length = __class__.block_height(v1, v2, current_step, steps)
             return v1 + direction * length
 
     @staticmethod
@@ -189,7 +198,8 @@ class Bridge24:
             v1 = src_loop[1].co
             v2 = dest_loop[int((2 ** (steps + 1)) / 2)].co
             direction = v2 - v1
-            length = __class__.block_height(v1, v2, current_step)
+            direction.normalize()
+            length = __class__.block_height(v1, v2, current_step, steps)
             return src_loop[1].co + direction * length
 
     @staticmethod
@@ -200,7 +210,8 @@ class Bridge24:
             v1 = src_loop[1].co + (src_loop[2].co - src_loop[1].co) / 2
             v2 = dest_loop[int((2 ** (steps + 1)) * 3 / 4)].co
             direction = v2 - v1
-            length = __class__.block_height(v1, v2, current_step)
+            direction.normalize()
+            length = __class__.block_height(v1, v2, current_step, steps)
             return v1 + direction * length
 
     @staticmethod
@@ -211,7 +222,8 @@ class Bridge24:
             v1 = src_loop[2].co
             v2 = dest_loop[2 ** (steps + 1)].co
             direction = v2 - v1
-            length = __class__.block_height(src_loop[0], dest_loop[0], current_step)
+            direction.normalize()
+            length = __class__.block_height(src_loop[0], dest_loop[0], current_step, steps)
             return src_loop[2].co + direction * length
 
 
