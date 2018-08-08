@@ -41,8 +41,8 @@ class Bridge24:
             dest_loop = loops[0] if src_loop == loops[1] else loops[1]
             # count levels with src and dest loops correction
             src_loop, dest_loop, levels = __class__.levels(src_loop, dest_loop)
-            print('src_loop', src_loop)
-            print('dest_loop', dest_loop)
+            print('src_loop', src_loop, ' len = ', len(src_loop))
+            print('dest_loop', dest_loop, ' len = ', len(dest_loop))
             print('levels', levels)
             if levels > 0:
                 for level in range(levels):
@@ -203,7 +203,7 @@ class Bridge24:
         v2 = dest_loop[len(dest_loop) - 1].co
         direction = v2 - v1
         direction.normalize()
-        length = __class__.level_height(src_loop[0], dest_loop[0], level, levels) / 2
+        length = __class__.level_height(v1, v2, level, levels) / 2
         return src_loop[2].co + direction * length
 
     @staticmethod
@@ -217,7 +217,7 @@ class Bridge24:
             v2 = dest_loop[0].co
             direction = v2 - v1
             direction.normalize()
-            length = __class__.level_height(src_loop[0], dest_loop[0], level, levels)
+            length = __class__.level_height(v1, v2, level, levels)
             return src_loop[0].co + direction * length
 
     @staticmethod
@@ -238,7 +238,7 @@ class Bridge24:
             return dest_loop[2]
         else:
             v1 = src_loop[1].co
-            v2 = dest_loop[int((2 ** (levels + 1)) / 2)].co
+            v2 = dest_loop[int((len(dest_loop) - 1) / 2)].co
             direction = v2 - v1
             direction.normalize()
             length = __class__.level_height(v1, v2, level, levels)
@@ -265,7 +265,7 @@ class Bridge24:
             v2 = dest_loop[len(dest_loop) - 1].co
             direction = v2 - v1
             direction.normalize()
-            length = __class__.level_height(src_loop[0], dest_loop[0], level, levels)
+            length = __class__.level_height(v1, v2, level, levels)
             return src_loop[2].co + direction * length
 
 
