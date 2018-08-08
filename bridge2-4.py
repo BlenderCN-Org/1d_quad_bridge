@@ -47,7 +47,11 @@ class Bridge24:
             if levels > 0:
                 for level in range(levels):
                     print('current level: ', level)
-                    __class__.build_level(bm, src_loop, dest_loop, level, levels)
+                    src_loop = __class__.build_level(bm, src_loop, dest_loop, level, levels)
+                    print('next src_loop ', src_loop)
+
+                    # if level == 0:
+                    #     break
 
 
 
@@ -79,52 +83,68 @@ class Bridge24:
             return (cor_src_loop, cor_dest_loop, levels)
 
     @staticmethod
-    def build_level(bm, src_loop, dest_loop, current_step, levels):
+    def build_level(bm, src_loop, dest_loop, level, levels):
+        # returns top line of the builded level (new src_loop for the next level)
+        top_line = []
         prev_block = None
-        for i in range(int((len(src_loop) - 1) / 2)):
-            print('current step:', i)
-            prev_block = __class__.block(src_loop[i * 2:], dest_loop[i * 4:], prev_block, current_step, levels)
-            print('block, ', prev_block)
+        for step in range(int((len(src_loop) - 1) / 2)):
+            print('current step:', step)
+            # prev_block = __class__.block(src_loop[step * 2:step * 2 + 3], dest_loop[step * 2 ** (levels + 1):step * 2 ** (levels + 1) + 2 ** (levels + 1) + 1], prev_block, level, levels)
+            prev_block = __class__.block(src_loop[step * 2:step * 2 + 3], dest_loop[step * 2 ** (levels - level + 1):step * 2 ** (levels - level + 1) + 2 ** (levels - level + 1) + 1], prev_block, level, levels)
             # build block from verts
             # verts to BMVert
-            bm_verts = []
-            for vert in prev_block:
+            for i, vert in enumerate(prev_block):
                 if vert:
-                    bm_vert = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
-                    bm_verts.append(bm_vert)
+                    prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
             # BMFaces from BMVerts
-            bm.faces.new([bm_verts[0], bm_verts[3], bm_verts[4], bm_verts[1]])
-            bm.faces.new([bm_verts[1], bm_verts[4], bm_verts[5], bm_verts[6]])
-            bm.faces.new([bm_verts[1], bm_verts[6], bm_verts[7], bm_verts[2]])
-            bm.faces.new([bm_verts[3], bm_verts[8], bm_verts[9], bm_verts[4]])
-            bm.faces.new([bm_verts[4], bm_verts[9], bm_verts[10], bm_verts[5]])
-            bm.faces.new([bm_verts[5], bm_verts[10], bm_verts[11], bm_verts[6]])
-            bm.faces.new([bm_verts[6], bm_verts[11], bm_verts[12], bm_verts[7]])
+            bm.faces.new([prev_block[0], prev_block[3], prev_block[4], prev_block[1]])
+            bm.faces.new([prev_block[1], prev_block[4], prev_block[5], prev_block[6]])
+            bm.faces.new([prev_block[1], prev_block[6], prev_block[7], prev_block[2]])
+            bm.faces.new([prev_block[3], prev_block[8], prev_block[9], prev_block[4]])
+            bm.faces.new([prev_block[4], prev_block[9], prev_block[10], prev_block[5]])
+            bm.faces.new([prev_block[5], prev_block[10], prev_block[11], prev_block[6]])
+            bm.faces.new([prev_block[6], prev_block[11], prev_block[12], prev_block[7]])
+            # append top_line
+            if not top_line:
+                top_line.append(prev_block[8])
+            top_line.extend([prev_block[9], prev_block[10], prev_block[11], prev_block[12]])
+        return top_line
 
 
     @staticmethod
-    def block(src_loop, dest_loop, prev_block, current_step, levels):
+    def block(src_loop, dest_loop, prev_block, level, levels):
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop),
-                __class__.v3(src_loop, dest_loop, prev_block, current_step, levels),
-                __class__.v4(src_loop, dest_loop, current_step, levels),
-                __class__.v5(src_loop, dest_loop, current_step, levels),
-                __class__.v6(src_loop, dest_loop, current_step, levels),
-                __class__.v7(src_loop, dest_loop, current_step, levels),
-                __class__.v8(src_loop, dest_loop, current_step, levels),
-                __class__.v9(src_loop, dest_loop, current_step, levels),
-                __class__.v10(src_loop, dest_loop, current_step, levels),
-                __class__.v11(src_loop, dest_loop, current_step, levels),
-                __class__.v12(src_loop, dest_loop, current_step, levels)
+                __class__.v3(src_loop, dest_loop, prev_block, level, levels),
+                __class__.v4(src_loop, dest_loop, level, levels),
+                __class__.v5(src_loop, dest_loop, level, levels),
+                __class__.v6(src_loop, dest_loop, level, levels),
+                __class__.v7(src_loop, dest_loop, level, levels),
+                __class__.v8(src_loop, dest_loop, prev_block, level, levels),
+                __class__.v9(src_loop, dest_loop, level, levels),
+                __class__.v10(src_loop, dest_loop, level, levels),
+                __class__.v11(src_loop, dest_loop, level, levels),
+                __class__.v12(src_loop, dest_loop, level, levels)
                 ]
 
     @staticmethod
-    def block_height(src_loop_vert, dest_loop_vert, current_step, levels):
+    def level_height(src_loop_vert, dest_loop_vert, level, levels, debug=0):
+        # returns height for the current level
         v1 = src_loop_vert.co if isinstance(src_loop_vert, bmesh.types.BMVert) else src_loop_vert
         v2 = dest_loop_vert.co if isinstance(dest_loop_vert, bmesh.types.BMVert) else dest_loop_vert
         length = (v1 - v2).length
-        return length / (2 ** (current_step + 1) - 1)
+        # return length * (2 ** (levels - (level + 1))) / (2 ** levels - 1)
+        levels = levels - level
+        level = 1
+        # if debug:
+        #     print('v5 height')
+        #     print('levels ', levels)
+        #     print('level ', level)
+        #     print('all parts ', 2 ** levels - 1)
+        #     print('get parts ', 2 ** (levels - level))
+        #     print('persentage, ', (2 ** (levels - level)) / (2 ** levels - 1))
+        return length * (2 ** (levels - level)) / (2 ** levels - 1)
 
     @staticmethod
     def v0(src_loop):
@@ -139,109 +159,113 @@ class Bridge24:
         return src_loop[2]
 
     @staticmethod
-    def v3(src_loop, dest_loop, prev_block, current_step, levels):
+    def v3(src_loop, dest_loop, prev_block, level, levels):
         if prev_block:
             return prev_block[7]
         else:
-            direction = dest_loop[0].co - src_loop[0].co
+            v1 = src_loop[0].co
+            v2 = dest_loop[0].co
+            direction = v2 - v1
             direction.normalize()
-            length = __class__.block_height(src_loop[0], dest_loop[0], current_step, levels) / 2
+            length = __class__.level_height(v1, v2, level, levels) / 2
             return src_loop[0].co + direction * length
 
     @staticmethod
-    def v4(src_loop, dest_loop, current_step, levels):
+    def v4(src_loop, dest_loop, level, levels):
         v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) / 2
-        v2 = dest_loop[int((2 ** (levels + 1)) / 4)].co
+        v2 = dest_loop[int((len(dest_loop) - 1) * 1 / 4)].co
         direction = v2 - v1
         direction.normalize()
-        length = __class__.block_height(v1, v2, current_step, levels) / 2
+        length = __class__.level_height(v1, v2, level, levels) / 2
         return v1 + direction * length
 
     @staticmethod
-    def v5(src_loop, dest_loop, current_step, levels):
+    def v5(src_loop, dest_loop, level, levels):
         v1 = src_loop[1].co
-        v2 = dest_loop[int((2 ** (levels + 1)) / 2)].co
+        v2 = dest_loop[int((len(dest_loop) - 1) / 2)].co
         direction = v2 - v1
         direction.normalize()
-        length = __class__.block_height(v1, v2, current_step, levels) * 3 / 4
+        length = __class__.level_height(v1, v2, level, levels, 1) * 3 / 4
         return src_loop[1].co + direction * length
 
     @staticmethod
-    def v6(src_loop, dest_loop, current_step, levels):
+    def v6(src_loop, dest_loop, level, levels):
         v1 = src_loop[1].co + (src_loop[2].co - src_loop[1].co) / 2
-        v2 = dest_loop[int((2 ** (levels + 1)) * 3 / 4)].co
+        v2 = dest_loop[int((len(dest_loop) - 1) * 3 / 4)].co
         direction = v2 - v1
         direction.normalize()
-        length = __class__.block_height(v1, v2, current_step, levels) / 2
+        length = __class__.level_height(v1, v2, level, levels) / 2
         return v1 + direction * length
 
     @staticmethod
-    def v7(src_loop, dest_loop, current_step, levels):
+    def v7(src_loop, dest_loop, level, levels):
         v1 = src_loop[2].co
-        v2 = dest_loop[2 ** (levels + 1)].co
+        v2 = dest_loop[len(dest_loop) - 1].co
         direction = v2 - v1
         direction.normalize()
-        length = __class__.block_height(src_loop[0], dest_loop[0], current_step, levels) / 2
+        length = __class__.level_height(src_loop[0], dest_loop[0], level, levels) / 2
         return src_loop[2].co + direction * length
 
     @staticmethod
-    def v8(src_loop, dest_loop, current_step, levels):
-        if current_step == levels - 1:
+    def v8(src_loop, dest_loop, prev_block, level, levels):
+        if prev_block:
+            return prev_block[12]
+        elif level == levels - 1:
             return dest_loop[0]
         else:
             v1 = src_loop[0].co
             v2 = dest_loop[0].co
             direction = v2 - v1
             direction.normalize()
-            length = __class__.block_height(src_loop[0], dest_loop[0], current_step, levels)
+            length = __class__.level_height(src_loop[0], dest_loop[0], level, levels)
             return src_loop[0].co + direction * length
 
     @staticmethod
-    def v9(src_loop, dest_loop, current_step, levels):
-        if current_step == levels - 1:
+    def v9(src_loop, dest_loop, level, levels):
+        if level == levels - 1:
             return dest_loop[1]
         else:
             v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) / 2
-            v2 = dest_loop[int((2 ** (levels + 1)) / 4)].co
+            v2 = dest_loop[int((len(dest_loop) - 1) * 1 / 4)].co
             direction = v2 - v1
             direction.normalize()
-            length = __class__.block_height(v1, v2, current_step, levels)
+            length = __class__.level_height(v1, v2, level, levels)
             return v1 + direction * length
 
     @staticmethod
-    def v10(src_loop, dest_loop, current_step, levels):
-        if current_step == levels - 1:
+    def v10(src_loop, dest_loop, level, levels):
+        if level == levels - 1:
             return dest_loop[2]
         else:
             v1 = src_loop[1].co
             v2 = dest_loop[int((2 ** (levels + 1)) / 2)].co
             direction = v2 - v1
             direction.normalize()
-            length = __class__.block_height(v1, v2, current_step, levels)
+            length = __class__.level_height(v1, v2, level, levels)
             return src_loop[1].co + direction * length
 
     @staticmethod
-    def v11(src_loop, dest_loop, current_step, levels):
-        if current_step == levels - 1:
+    def v11(src_loop, dest_loop, level, levels):
+        if level == levels - 1:
             return dest_loop[3]
         else:
             v1 = src_loop[1].co + (src_loop[2].co - src_loop[1].co) / 2
-            v2 = dest_loop[int((2 ** (levels + 1)) * 3 / 4)].co
+            v2 = dest_loop[int((len(dest_loop) - 1) * 3 / 4)].co
             direction = v2 - v1
             direction.normalize()
-            length = __class__.block_height(v1, v2, current_step, levels)
+            length = __class__.level_height(v1, v2, level, levels)
             return v1 + direction * length
 
     @staticmethod
-    def v12(src_loop, dest_loop, current_step, levels):
-        if current_step == levels - 1:
+    def v12(src_loop, dest_loop, level, levels):
+        if level == levels - 1:
             return dest_loop[4]
         else:
             v1 = src_loop[2].co
-            v2 = dest_loop[2 ** (levels + 1)].co
+            v2 = dest_loop[len(dest_loop) - 1].co
             direction = v2 - v1
             direction.normalize()
-            length = __class__.block_height(src_loop[0], dest_loop[0], current_step, levels)
+            length = __class__.level_height(src_loop[0], dest_loop[0], level, levels)
             return src_loop[2].co + direction * length
 
 
