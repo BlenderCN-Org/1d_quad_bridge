@@ -5,14 +5,14 @@
 #   https://github.com/Korchy/1d_bridge2-4
 #
 # Version history:
-#   0.0. (2018.07.21) - start dev
+#   0.1.0. (2018.07.21) - start dev
 
 
 bl_info = {
     'name': 'Bridge2-4',
     'category': 'Mesh',
     'author': 'Nikita Akimov',
-    'version': (0, 0, 0),
+    'version': (0, 1, 0),
     'blender': (2, 79, 0),
     'location': 'The 3D_View window - T-panel - the 1D tab',
     'wiki_url': 'https://github.com/Korchy/1d_bridge2-4',
@@ -22,8 +22,6 @@ bl_info = {
 
 import bpy
 import bmesh
-from mathutils import Vector
-import math
 
 
 class Bridge24:
@@ -41,20 +39,14 @@ class Bridge24:
             dest_loop = loops[0] if src_loop == loops[1] else loops[1]
             # count levels with src and dest loops correction
             src_loop, dest_loop, levels = __class__.levels(src_loop, dest_loop)
-            print('src_loop', src_loop, ' len = ', len(src_loop))
-            print('dest_loop', dest_loop, ' len = ', len(dest_loop))
-            print('levels', levels)
+            # print('src_loop', src_loop, ' len = ', len(src_loop))
+            # print('dest_loop', dest_loop, ' len = ', len(dest_loop))
+            # print('levels', levels)
             if levels > 0:
                 for level in range(levels):
-                    print('current level: ', level)
+                    # print('current level: ', level)
                     src_loop = __class__.build_level(bm, src_loop, dest_loop, level, levels)
-                    print('next src_loop ', src_loop)
-
-                    # if level == 0:
-                    #     break
-
-
-
+                    # print('next src_loop ', src_loop)
         bm.to_mesh(context.object.data)
         bm.free()
         bpy.ops.object.mode_set(mode='EDIT')
@@ -88,8 +80,7 @@ class Bridge24:
         top_line = []
         prev_block = None
         for step in range(int((len(src_loop) - 1) / 2)):
-            print('current step:', step)
-            # prev_block = __class__.block(src_loop[step * 2:step * 2 + 3], dest_loop[step * 2 ** (levels + 1):step * 2 ** (levels + 1) + 2 ** (levels + 1) + 1], prev_block, level, levels)
+            # print('current step:', step)
             prev_block = __class__.block(src_loop[step * 2:step * 2 + 3], dest_loop[step * 2 ** (levels - level + 1):step * 2 ** (levels - level + 1) + 2 ** (levels - level + 1) + 1], prev_block, level, levels)
             # build block from verts
             # verts to BMVert
@@ -134,9 +125,8 @@ class Bridge24:
         v1 = src_loop_vert.co if isinstance(src_loop_vert, bmesh.types.BMVert) else src_loop_vert
         v2 = dest_loop_vert.co if isinstance(dest_loop_vert, bmesh.types.BMVert) else dest_loop_vert
         length = (v1 - v2).length
-        # return length * (2 ** (levels - (level + 1))) / (2 ** levels - 1)
         levels = levels - level
-        level = 1
+        level = 1   # level = 1 every time (because src_loops updates every level)
         # if debug:
         #     print('v5 height')
         #     print('levels ', levels)
