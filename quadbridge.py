@@ -6,13 +6,14 @@
 #
 # Version history:
 #   0.1.0. (2018.07.21) - start dev
+#   0.2.0. (2018.08.18) - added 3 more bridges types
 
 
 bl_info = {
     'name': 'Bridge2-4',
     'category': 'Mesh',
     'author': 'Nikita Akimov',
-    'version': (0, 1, 0),
+    'version': (0, 2, 0),
     'blender': (2, 79, 0),
     'location': 'The 3D_View window - T-panel - the 1D tab',
     'wiki_url': 'https://github.com/Korchy/1d_quad_bridge',
@@ -25,11 +26,13 @@ import bmesh
 import bpy.utils.previews
 import os
 from inspect import getsourcefile
+from abc import ABC, abstractmethod
 
 
-class QuadBridge:
-    @staticmethod
-    def make_bridge(context):
+class QuadBridge(ABC):
+
+    @classmethod
+    def make_bridge(cls, context):
         if context.selected_objects:
             bpy.ops.object.mode_set(mode='OBJECT')
             bm = bmesh.new()
@@ -42,22 +45,36 @@ class QuadBridge:
                 src_loop = loops[0] if len(loops[0]) < len(loops[1]) else loops[1]
                 dest_loop = loops[0] if src_loop == loops[1] else loops[1]
                 # count levels with src and dest loops correction
-                src_loop, dest_loop, levels = __class__.levels(src_loop, dest_loop)
+                # src_loop, dest_loop, levels = __class__.levels(src_loop, dest_loop)
+                src_loop, dest_loop, levels = cls.levels(src_loop, dest_loop)
                 # print('src_loop', src_loop, ' len = ', len(src_loop))
                 # print('dest_loop', dest_loop, ' len = ', len(dest_loop))
                 # print('levels', levels)
                 if levels > 0:
                     for level in range(levels):
                         # print('current level: ', level)
-                        src_loop = __class__.build_level(bm, src_loop, dest_loop, level, levels)
+                        src_loop = cls.build_level(bm, src_loop, dest_loop, level, levels)
                         # print('next src_loop ', src_loop)
             bm.to_mesh(context.object.data)
             bm.free()
             bpy.ops.object.mode_set(mode='EDIT')
 
-    @staticmethod
-    def levels(src_loop, dest_loop):
-        # count levels with src and dest loops correction (cutting redundant verts from the end of the lists)
+    @abstractmethod
+    def levels(cls, src_loop, dest_loop):
+        # count levels and make src_loop and dest loop correction (cutting redundant verts from the end of the lists)
+        return (src_loop, dest_loop, 0)
+
+    @abstractmethod
+    def build_level(cls, bm, src_loop, dest_loop, level, levels):
+        # Build 1 level of the bridge
+        # returns top line of the builded level (new src_loop for the next level)
+        return []
+
+
+class QuadBirdge_3_5(QuadBridge):
+
+    @classmethod
+    def levels(cls, src_loop, dest_loop):
         if src_loop and dest_loop:
             levels = 0
             cor_src_loop = src_loop
@@ -78,9 +95,8 @@ class QuadBridge:
                 cor_dest_loop = dest_loop[:src_len + 1]
             return (cor_src_loop, cor_dest_loop, levels)
 
-    @staticmethod
-    def build_level(bm, src_loop, dest_loop, level, levels):
-        # returns top line of the builded level (new src_loop for the next level)
+    @classmethod
+    def build_level(cls, bm, src_loop, dest_loop, level, levels):
         top_line = []
         prev_block = None
         for step in range(int((len(src_loop) - 1) / 2)):
@@ -263,6 +279,18 @@ class QuadBridge:
             return src_loop[2].co + direction * length
 
 
+class QuadBridges:
+
+    bridges = [['3-5', 'b00.jpg', QuadBirdge_3_5],
+               ['2-4', 'b01.jpg', None],
+               ]
+
+    @staticmethod
+    def bridge(bridge_id, context):
+        if __class__.bridges[bridge_id][2]:
+            __class__.bridges[bridge_id][2].make_bridge(context)
+
+
 class BmEx:
     @staticmethod
     def get_verts_loops_from_selection(bm):
@@ -324,16 +352,12 @@ class QuadBridgeOp(bpy.types.Operator):
     )
 
     def execute(self, context):
-        # QuadBridge.make_bridge(context, self.bridge_id)
-        QuadBridge.make_bridge(context)
+        QuadBridges.bridge(self.bridge_id, context)
         return {'FINISHED'}
 
 
 class QuadBridgePreviews:
 
-    previews = [['01', '3-5', 'b01.jpg'],
-                ['02', '2-4', 'b02.jpg'],
-                ]
     items_list = None
 
     @staticmethod
@@ -349,10 +373,10 @@ class QuadBridgePreviews:
 
     @staticmethod
     def create_previews():
-        for preview in __class__.previews:
-            path = __class__.get_preview_path(preview[2])
+        for i, bridge in enumerate(QuadBridges.bridges):
+            path = __class__.get_preview_path(bridge[1])
             thumb = __class__.items_list.load(path, path, 'IMAGE')
-            __class__.items_list.items.append((preview[0], preview[1], '', thumb.icon_id, int(preview[0])))
+            __class__.items_list.items.append((str(i), bridge[0], '', thumb.icon_id, i))
 
     @staticmethod
     def get_previews(self, context):
