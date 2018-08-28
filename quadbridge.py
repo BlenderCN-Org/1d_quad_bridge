@@ -2,7 +2,7 @@
 # interplanety@interplanety.org
 #
 # GitHub
-#   https://github.com/Korchy/1d_bridge2-4
+#   https://github.com/Korchy/1d_quad_bridge
 #
 # Version history:
 #   0.1.0. (2018.07.21) - start dev
@@ -15,41 +15,45 @@ bl_info = {
     'version': (0, 1, 0),
     'blender': (2, 79, 0),
     'location': 'The 3D_View window - T-panel - the 1D tab',
-    'wiki_url': 'https://github.com/Korchy/1d_bridge2-4',
-    'tracker_url': 'https://github.com/Korchy/1d_bridge2-4',
-    'description': 'Bridge 2-4'
+    'wiki_url': 'https://github.com/Korchy/1d_quad_bridge',
+    'tracker_url': 'https://github.com/Korchy/1d_quad_bridge',
+    'description': 'Quad Bridge'
 }
 
 import bpy
 import bmesh
+import bpy.utils.previews
+import os
+from inspect import getsourcefile
 
 
-class Bridge24:
+class QuadBridge:
     @staticmethod
     def make_bridge(context):
-        bpy.ops.object.mode_set(mode='OBJECT')
-        bm = bmesh.new()
-        bm.from_mesh(context.object.data)
+        if context.selected_objects:
+            bpy.ops.object.mode_set(mode='OBJECT')
+            bm = bmesh.new()
+            bm.from_mesh(context.object.data)
 
-        bm.verts.ensure_lookup_table()
-        bm.edges.ensure_lookup_table()
-        loops = BmEx.get_verts_loops_from_selection(bm)
-        if len(loops) == 2:
-            src_loop = loops[0] if len(loops[0]) < len(loops[1]) else loops[1]
-            dest_loop = loops[0] if src_loop == loops[1] else loops[1]
-            # count levels with src and dest loops correction
-            src_loop, dest_loop, levels = __class__.levels(src_loop, dest_loop)
-            # print('src_loop', src_loop, ' len = ', len(src_loop))
-            # print('dest_loop', dest_loop, ' len = ', len(dest_loop))
-            # print('levels', levels)
-            if levels > 0:
-                for level in range(levels):
-                    # print('current level: ', level)
-                    src_loop = __class__.build_level(bm, src_loop, dest_loop, level, levels)
-                    # print('next src_loop ', src_loop)
-        bm.to_mesh(context.object.data)
-        bm.free()
-        bpy.ops.object.mode_set(mode='EDIT')
+            bm.verts.ensure_lookup_table()
+            bm.edges.ensure_lookup_table()
+            loops = BmEx.get_verts_loops_from_selection(bm)
+            if len(loops) == 2:
+                src_loop = loops[0] if len(loops[0]) < len(loops[1]) else loops[1]
+                dest_loop = loops[0] if src_loop == loops[1] else loops[1]
+                # count levels with src and dest loops correction
+                src_loop, dest_loop, levels = __class__.levels(src_loop, dest_loop)
+                # print('src_loop', src_loop, ' len = ', len(src_loop))
+                # print('dest_loop', dest_loop, ' len = ', len(dest_loop))
+                # print('levels', levels)
+                if levels > 0:
+                    for level in range(levels):
+                        # print('current level: ', level)
+                        src_loop = __class__.build_level(bm, src_loop, dest_loop, level, levels)
+                        # print('next src_loop ', src_loop)
+            bm.to_mesh(context.object.data)
+            bm.free()
+            bpy.ops.object.mode_set(mode='EDIT')
 
     @staticmethod
     def levels(src_loop, dest_loop):
@@ -298,35 +302,96 @@ class BmEx:
                 return False
 
 
-class Bridge24Panel(bpy.types.Panel):
-    bl_idname = 'bridge24.panel'
-    bl_label = 'Bridge24'
+class QuadBridgePanel(bpy.types.Panel):
+    bl_idname = 'quadbridge.panel'
+    bl_label = 'QuadBridge'
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
     bl_category = '1D'
 
     def draw(self, context):
-        self.layout.operator('bridge24.start', icon='NONE', text='Make Bridge 2-4')
+        self.layout.template_icon_view(context.window_manager.quadbridge_previews, 'items', show_labels=True)
 
 
-class Bridge24Op(bpy.types.Operator):
-    bl_idname = 'bridge24.start'
+class QuadBridgeOp(bpy.types.Operator):
+    bl_idname = 'quadbridge.start'
     bl_label = 'Make Bridge 2-4'
     bl_options = {'REGISTER', 'UNDO'}
 
+    bridge_id = bpy.props.IntProperty(
+        name='BridgeId',
+        default=0
+    )
+
     def execute(self, context):
-        Bridge24.make_bridge(context)
+        # QuadBridge.make_bridge(context, self.bridge_id)
+        QuadBridge.make_bridge(context)
         return {'FINISHED'}
 
 
+class QuadBridgePreviews:
+
+    previews = [['01', '3-5', 'b01.jpg'],
+                ['02', '2-4', 'b02.jpg'],
+                ]
+    items_list = None
+
+    @staticmethod
+    def register():
+        __class__.items_list = bpy.utils.previews.new()
+        __class__.items_list.items = []
+        __class__.create_previews()
+
+    @staticmethod
+    def unregister():
+        __class__.items_list.items.clear()
+        bpy.utils.previews.remove(__class__.items_list)
+
+    @staticmethod
+    def create_previews():
+        for preview in __class__.previews:
+            path = __class__.get_preview_path(preview[2])
+            thumb = __class__.items_list.load(path, path, 'IMAGE')
+            __class__.items_list.items.append((preview[0], preview[1], '', thumb.icon_id, int(preview[0])))
+
+    @staticmethod
+    def get_previews(self, context):
+        if context:
+            return __class__.items_list.items
+        else:
+            return []
+
+    @staticmethod
+    def get_preview_path(filename):
+        return os.path.dirname(os.path.abspath(getsourcefile(lambda:0))) + os.path.sep + 'img' + os.path.sep + filename
+
+    @staticmethod
+    def on_preview_select(self, context):
+        bpy.ops.quadbridge.start(bridge_id=int(self.items))
+        bpy.ops.ed.undo_push()
+
+
+class QuadBridgePreviewsItems(bpy.types.PropertyGroup):
+    items = bpy.props.EnumProperty(
+        items=lambda self, context: QuadBridgePreviews.get_previews(self, context),
+        update=lambda self, context: QuadBridgePreviews.on_preview_select(self, context)
+    )
+
+
 def register():
-    bpy.utils.register_class(Bridge24Op)
-    bpy.utils.register_class(Bridge24Panel)
+    bpy.utils.register_class(QuadBridgeOp)
+    bpy.utils.register_class(QuadBridgePanel)
+    QuadBridgePreviews.register()
+    bpy.utils.register_class(QuadBridgePreviewsItems)
+    bpy.types.WindowManager.quadbridge_previews = bpy.props.PointerProperty(type=QuadBridgePreviewsItems)
 
 
 def unregister():
-    bpy.utils.unregister_class(Bridge24Panel)
-    bpy.utils.unregister_class(Bridge24Op)
+    del bpy.types.WindowManager.quadbridge_previews
+    QuadBridgePreviews.unregister()
+    bpy.utils.unregister_class(QuadBridgePreviewsItems)
+    bpy.utils.unregister_class(QuadBridgePanel)
+    bpy.utils.unregister_class(QuadBridgeOp)
 
 
 if __name__ == '__main__':
