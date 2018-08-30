@@ -53,7 +53,6 @@ class QuadBridge(ABC):
                 src_loop = loops[0] if len(loops[0]) < len(loops[1]) else loops[1]
                 dest_loop = loops[0] if src_loop == loops[1] else loops[1]
                 # count levels with src and dest loops correction
-                # src_loop, dest_loop, levels = __class__.levels(src_loop, dest_loop)
                 src_loop, dest_loop, levels = cls.levels(src_loop, dest_loop)
                 # print('src_loop', src_loop, ' len = ', len(src_loop))
                 # print('dest_loop', dest_loop, ' len = ', len(dest_loop))
@@ -85,12 +84,15 @@ class QuadBridge(ABC):
                 src_edges = len(cor_src_loop) - 1
                 dest_edges = len(dest_loop) - 1
                 # print('block_level_power', cls.block_level_power())
-                while src_edges * cls.block_level_power() <= dest_edges:
-                    levels += 1
-                    src_edges *= cls.block_level_power()
-                    # print('src_edges', src_edges)
-                    # if levels > 20:
-                    #     break
+                if cls.block_level_power() == 1:
+                    levels = 1
+                elif cls.block_level_power() > 1:
+                    while src_edges * cls.block_level_power() <= dest_edges:
+                        levels += 1
+                        src_edges *= cls.block_level_power()
+                        # print('src_edges', src_edges)
+                        # if levels > 20:
+                        #     break
                 # correct dest_loop
                 cor_dest_loop = dest_loop[:src_edges + 1]
             return (cor_src_loop, cor_dest_loop, levels)
@@ -456,10 +458,109 @@ class QuadBirdge_2_4(QuadBridge):
             return v1 + direction * length
 
 
+class QuadBirdge_2_2(QuadBridge):
+
+    block_src_verts = 2
+    block_dest_verts = 2
+
+    @classmethod
+    def build_level(cls, bm, src_loop, dest_loop, level, levels):
+        top_line = []
+        prev_block = None
+        steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
+        # print('steps ', steps_on_level)
+        for step in range(steps_on_level):
+            # print('current step:', step)
+            step_src_loop = src_loop[step * cls.block_src_edges():step * cls.block_src_edges() + cls.block_src_verts]
+            step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
+            # print('step dest_loop', step_dest_loop)
+            prev_block = __class__.block(step_src_loop, step_dest_loop, prev_block, level, levels)
+            # build block from verts
+            # verts to BMVert
+            for i, vert in enumerate(prev_block):
+                if vert:
+                    prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
+            # BMFaces from BMVerts
+            bm.faces.new([prev_block[0], prev_block[2], prev_block[3], prev_block[1]])
+            bm.faces.new([prev_block[2], prev_block[4], prev_block[5], prev_block[3]])
+            # append top_line
+            if not top_line:
+                top_line.append(prev_block[4])
+            top_line.extend([prev_block[5]])
+        return top_line
+
+
+    @staticmethod
+    def block(src_loop, dest_loop, prev_block, level, levels):
+        return [__class__.v0(src_loop),
+                __class__.v1(src_loop),
+                __class__.v2(src_loop, dest_loop, prev_block, level, levels),
+                __class__.v3(src_loop, dest_loop, level, levels),
+                __class__.v4(src_loop, dest_loop, prev_block, level, levels),
+                __class__.v5(src_loop, dest_loop, level, levels)
+                ]
+
+    @staticmethod
+    def v0(src_loop):
+        return src_loop[0]
+
+    @staticmethod
+    def v1(src_loop):
+        return src_loop[1]
+
+    @staticmethod
+    def v2(src_loop, dest_loop, prev_block, level, levels):
+        if prev_block:
+            return prev_block[3]
+        else:
+            v1 = src_loop[0].co
+            v2 = dest_loop[0].co
+            direction = v2 - v1
+            direction.normalize()
+            length = __class__.level_height(v1, v2, level, levels) / 2
+            return src_loop[0].co + direction * length
+
+    @staticmethod
+    def v3(src_loop, dest_loop, level, levels):
+        v1 = src_loop[1].co
+        v2 = dest_loop[len(dest_loop) - 1].co
+        direction = v2 - v1
+        direction.normalize()
+        length = __class__.level_height(v1, v2, level, levels, 1) / 2
+        return v1 + direction * length
+
+    @staticmethod
+    def v4(src_loop, dest_loop, prev_block, level, levels):
+        if prev_block:
+            return prev_block[5]
+        elif level == levels - 1:
+            return dest_loop[0]
+        else:
+            v1 = src_loop[0].co
+            v2 = dest_loop[0].co
+            direction = v2 - v1
+            direction.normalize()
+            length = __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v5(src_loop, dest_loop, level, levels):
+        if level == levels - 1:
+            return dest_loop[1]
+        else:
+            v1 = src_loop[1].co
+            v2 = dest_loop[len(dest_loop) - 1].co
+            direction = v2 - v1
+            direction.normalize()
+            length = __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+
 class QuadBridges:
 
     bridges = [['3-5', 'b00.jpg', QuadBirdge_3_5],
                ['2-4', 'b01.jpg', QuadBirdge_2_4],
+               ['2-2', 'b02.jpg', QuadBirdge_2_2],
                ]
 
     @staticmethod
