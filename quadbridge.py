@@ -7,7 +7,7 @@
 # Version history:
 #   0.1.0. (2018.07.21) - start dev
 #   0.2.0. (2018.08.18) - added 3 more bridges types (2-4, 2-2, 1-3)
-#   0.2.1. (2018.08.31) - added 3-7 bridges type
+#   0.2.1. (2018.08.31) - added 3-7 bridges
 
 
 import bpy
