@@ -114,10 +114,39 @@ class QuadBridge(ABC):
         #     print('persentage, ', (2 ** (levels - level)) / (2 ** levels - 1))
         return length * (2 ** (levels - level)) / (2 ** levels - 1)
 
-    @abstractmethod
+    @classmethod
     def build_level(cls, bm, src_loop, dest_loop, level, levels):
-        # Build 1 level of the bridge
-        # returns top line of the builded level (new src_loop for the next level)
+        new_src_loop = []
+        prev_block = None
+        steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
+        # print('steps ', steps_on_level)
+        for step in range(steps_on_level):
+            # print('current step:', step)
+            step_src_loop = src_loop[step * cls.block_src_edges():step * cls.block_src_edges() + cls.block_src_verts]
+            step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
+            # print('step_dest_loop', step_dest_loop)
+            prev_block = cls.block(step_src_loop, step_dest_loop, prev_block, level, levels)
+            # verts to BMVert
+            for i, vert in enumerate(prev_block):
+                if vert:
+                    prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
+            block_top_line = cls.fillBlock(bm, prev_block)
+            # append new_src_loop
+            if not new_src_loop:
+                new_src_loop.append(block_top_line[0])
+            new_src_loop.extend(block_top_line[1:])
+        return new_src_loop
+
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, level, levels):
+        # make block verts here
+        # returns list with current block verts
+        return []
+
+    @classmethod
+    def fillBlock(cls, bm, block_verts):
+        # make block faces from block_verts here
+        # returns sorted(!) top line of the block
         return []
 
     @classmethod
@@ -140,39 +169,20 @@ class QuadBirdge_3_5(QuadBridge):
     block_dest_verts = 5
 
     @classmethod
-    def build_level(cls, bm, src_loop, dest_loop, level, levels):
-        top_line = []
-        prev_block = None
-        steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
-        # print('steps ', steps_on_level)
-        for step in range(int((len(src_loop) - 1) / cls.block_src_edges())):
-            # print('current step:', step)
-            step_src_loop = src_loop[step * cls.block_src_edges():step * cls.block_src_edges() + cls.block_src_verts]
-            step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
-            # print('step_dest_loop', step_dest_loop)
-            prev_block = __class__.block(step_src_loop, step_dest_loop, prev_block, level, levels)
-            # build block from verts
-            # verts to BMVert
-            for i, vert in enumerate(prev_block):
-                if vert:
-                    prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
-            # BMFaces from BMVerts
-            bm.faces.new([prev_block[0], prev_block[3], prev_block[4], prev_block[1]])
-            bm.faces.new([prev_block[1], prev_block[4], prev_block[5], prev_block[6]])
-            bm.faces.new([prev_block[1], prev_block[6], prev_block[7], prev_block[2]])
-            bm.faces.new([prev_block[3], prev_block[8], prev_block[9], prev_block[4]])
-            bm.faces.new([prev_block[4], prev_block[9], prev_block[10], prev_block[5]])
-            bm.faces.new([prev_block[5], prev_block[10], prev_block[11], prev_block[6]])
-            bm.faces.new([prev_block[6], prev_block[11], prev_block[12], prev_block[7]])
-            # append top_line
-            if not top_line:
-                top_line.append(prev_block[8])
-            top_line.extend([prev_block[9], prev_block[10], prev_block[11], prev_block[12]])
-        return top_line
+    def fillBlock(cls, bm, block_verts):
+        # BMFaces from BMVerts
+        bm.faces.new([block_verts[0], block_verts[3], block_verts[4], block_verts[1]])
+        bm.faces.new([block_verts[1], block_verts[4], block_verts[5], block_verts[6]])
+        bm.faces.new([block_verts[1], block_verts[6], block_verts[7], block_verts[2]])
+        bm.faces.new([block_verts[3], block_verts[8], block_verts[9], block_verts[4]])
+        bm.faces.new([block_verts[4], block_verts[9], block_verts[10], block_verts[5]])
+        bm.faces.new([block_verts[5], block_verts[10], block_verts[11], block_verts[6]])
+        bm.faces.new([block_verts[6], block_verts[11], block_verts[12], block_verts[7]])
+        # returns sorted(!) top line of the block
+        return [block_verts[8], block_verts[9], block_verts[10], block_verts[11], block_verts[12]]
 
-
-    @staticmethod
-    def block(src_loop, dest_loop, prev_block, level, levels):
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, level, levels):
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop),
@@ -317,37 +327,18 @@ class QuadBirdge_2_4(QuadBridge):
     block_dest_verts = 4
 
     @classmethod
-    def build_level(cls, bm, src_loop, dest_loop, level, levels):
-        top_line = []
-        prev_block = None
-        steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
-        # print('steps ', steps_on_level)
-        for step in range(steps_on_level):
-            # print('current step:', step)
-            step_src_loop = src_loop[step * cls.block_src_edges():step * cls.block_src_edges() + cls.block_src_verts]
-            step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
-            # print('step dest_loop', step_dest_loop)
-            prev_block = __class__.block(step_src_loop, step_dest_loop, prev_block, level, levels)
-            # build block from verts
-            # verts to BMVert
-            for i, vert in enumerate(prev_block):
-                if vert:
-                    prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
-            # BMFaces from BMVerts
-            bm.faces.new([prev_block[0], prev_block[2], prev_block[3], prev_block[4]])
-            bm.faces.new([prev_block[0], prev_block[4], prev_block[5], prev_block[1]])
-            bm.faces.new([prev_block[2], prev_block[6], prev_block[7], prev_block[3]])
-            bm.faces.new([prev_block[3], prev_block[7], prev_block[8], prev_block[4]])
-            bm.faces.new([prev_block[4], prev_block[8], prev_block[9], prev_block[5]])
-            # append top_line
-            if not top_line:
-                top_line.append(prev_block[6])
-            top_line.extend([prev_block[7], prev_block[8], prev_block[9]])
-        return top_line
+    def fillBlock(cls, bm, block_verts):
+        # BMFaces from BMVerts
+        bm.faces.new([block_verts[0], block_verts[2], block_verts[3], block_verts[4]])
+        bm.faces.new([block_verts[0], block_verts[4], block_verts[5], block_verts[1]])
+        bm.faces.new([block_verts[2], block_verts[6], block_verts[7], block_verts[3]])
+        bm.faces.new([block_verts[3], block_verts[7], block_verts[8], block_verts[4]])
+        bm.faces.new([block_verts[4], block_verts[8], block_verts[9], block_verts[5]])
+        # returns sorted(!) top line of the block
+        return [block_verts[6], block_verts[7], block_verts[8], block_verts[9]]
 
-
-    @staticmethod
-    def block(src_loop, dest_loop, prev_block, level, levels):
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, level, levels):
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop, dest_loop, prev_block, level, levels),
@@ -464,34 +455,15 @@ class QuadBirdge_2_2(QuadBridge):
     block_dest_verts = 2
 
     @classmethod
-    def build_level(cls, bm, src_loop, dest_loop, level, levels):
-        top_line = []
-        prev_block = None
-        steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
-        # print('steps ', steps_on_level)
-        for step in range(steps_on_level):
-            # print('current step:', step)
-            step_src_loop = src_loop[step * cls.block_src_edges():step * cls.block_src_edges() + cls.block_src_verts]
-            step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
-            # print('step dest_loop', step_dest_loop)
-            prev_block = __class__.block(step_src_loop, step_dest_loop, prev_block, level, levels)
-            # build block from verts
-            # verts to BMVert
-            for i, vert in enumerate(prev_block):
-                if vert:
-                    prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
-            # BMFaces from BMVerts
-            bm.faces.new([prev_block[0], prev_block[2], prev_block[3], prev_block[1]])
-            bm.faces.new([prev_block[2], prev_block[4], prev_block[5], prev_block[3]])
-            # append top_line
-            if not top_line:
-                top_line.append(prev_block[4])
-            top_line.extend([prev_block[5]])
-        return top_line
+    def fillBlock(cls, bm, block_verts):
+        # BMFaces from BMVerts
+        bm.faces.new([block_verts[0], block_verts[2], block_verts[3], block_verts[1]])
+        bm.faces.new([block_verts[2], block_verts[4], block_verts[5], block_verts[3]])
+        # returns sorted(!) top line of the block
+        return [block_verts[4], block_verts[5]]
 
-
-    @staticmethod
-    def block(src_loop, dest_loop, prev_block, level, levels):
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, level, levels):
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop, dest_loop, prev_block, level, levels),
@@ -562,41 +534,22 @@ class QuadBirdge_1_3(QuadBridge):
     block_dest_verts = 5
 
     @classmethod
-    def build_level(cls, bm, src_loop, dest_loop, level, levels):
-        top_line = []
-        prev_block = None
-        steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
-        # print('steps ', steps_on_level)
-        for step in range(int((len(src_loop) - 1) / cls.block_src_edges())):
-            # print('current step:', step)
-            step_src_loop = src_loop[step * cls.block_src_edges():step * cls.block_src_edges() + cls.block_src_verts]
-            step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
-            # print('step_dest_loop', step_dest_loop)
-            prev_block = __class__.block(step_src_loop, step_dest_loop, prev_block, level, levels)
-            # build block from verts
-            # verts to BMVert
-            for i, vert in enumerate(prev_block):
-                if vert:
-                    prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
-            # BMFaces from BMVerts
-            bm.faces.new([prev_block[0], prev_block[5], prev_block[6], prev_block[1]])
-            bm.faces.new([prev_block[1], prev_block[6], prev_block[7], prev_block[2]])
-            bm.faces.new([prev_block[0], prev_block[3], prev_block[4], prev_block[5]])
-            bm.faces.new([prev_block[2], prev_block[7], prev_block[8], prev_block[9]])
-            bm.faces.new([prev_block[3], prev_block[10], prev_block[11], prev_block[4]])
-            bm.faces.new([prev_block[4], prev_block[11], prev_block[12], prev_block[5]])
-            bm.faces.new([prev_block[6], prev_block[5], prev_block[12], prev_block[7]])
-            bm.faces.new([prev_block[7], prev_block[12], prev_block[13], prev_block[8]])
-            bm.faces.new([prev_block[8], prev_block[13], prev_block[14], prev_block[9]])
-            # append top_line
-            if not top_line:
-                top_line.append(prev_block[10])
-            top_line.extend([prev_block[11], prev_block[12], prev_block[13], prev_block[14]])
-        return top_line
+    def fillBlock(cls, bm, block_verts):
+        # BMFaces from BMVerts
+        bm.faces.new([block_verts[0], block_verts[5], block_verts[6], block_verts[1]])
+        bm.faces.new([block_verts[1], block_verts[6], block_verts[7], block_verts[2]])
+        bm.faces.new([block_verts[0], block_verts[3], block_verts[4], block_verts[5]])
+        bm.faces.new([block_verts[2], block_verts[7], block_verts[8], block_verts[9]])
+        bm.faces.new([block_verts[3], block_verts[10], block_verts[11], block_verts[4]])
+        bm.faces.new([block_verts[4], block_verts[11], block_verts[12], block_verts[5]])
+        bm.faces.new([block_verts[6], block_verts[5], block_verts[12], block_verts[7]])
+        bm.faces.new([block_verts[7], block_verts[12], block_verts[13], block_verts[8]])
+        bm.faces.new([block_verts[8], block_verts[13], block_verts[14], block_verts[9]])
+        # returns sorted(!) top line of the block
+        return [block_verts[10], block_verts[11], block_verts[12], block_verts[13], block_verts[14]]
 
-
-    @staticmethod
-    def block(src_loop, dest_loop, prev_block, level, levels):
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, level, levels):
         return [__class__.v0(src_loop),
                 __class__.v1(src_loop),
                 __class__.v2(src_loop),
