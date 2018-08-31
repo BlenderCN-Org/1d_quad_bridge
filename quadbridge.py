@@ -9,18 +9,6 @@
 #   0.2.0. (2018.08.18) - added 3 more bridges types
 
 
-bl_info = {
-    'name': 'Bridge2-4',
-    'category': 'Mesh',
-    'author': 'Nikita Akimov',
-    'version': (0, 2, 0),
-    'blender': (2, 79, 0),
-    'location': 'The 3D_View window - T-panel - the 1D tab',
-    'wiki_url': 'https://github.com/Korchy/1d_quad_bridge',
-    'tracker_url': 'https://github.com/Korchy/1d_quad_bridge',
-    'description': 'Quad Bridge'
-}
-
 import bpy
 import bmesh
 import bpy.utils.previews
