@@ -710,6 +710,7 @@ class QuadBirdge_1_3(QuadBridge):
 
 class QuadBridges:
 
+    # add new Bridge class here to make new preview in the menu
     bridges = [['3-5', 'b00.jpg', QuadBirdge_3_5],
                ['2-4', 'b01.jpg', QuadBirdge_2_4],
                ['2-2', 'b02.jpg', QuadBirdge_2_2],
