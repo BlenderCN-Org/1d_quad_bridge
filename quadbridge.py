@@ -8,7 +8,7 @@
 #   0.1.0. (2018.07.21) - start dev
 #   0.2.0. (2018.08.18) - added 3 more bridges types (2-4, 2-2, 1-3)
 #   0.2.1. (2018.08.31) - added 3-7 bridges
-
+#   0.3.0. (2018.09.04) - improve - add filing closed areas (two types: 1) to center from two sides 2) to dest loop with its recreation)
 
 import bpy
 import bmesh
@@ -34,27 +34,77 @@ class QuadBridge(ABC):
             bpy.ops.object.mode_set(mode='OBJECT')
             bm = bmesh.new()
             bm.from_mesh(context.object.data)
-
             bm.verts.ensure_lookup_table()
             bm.edges.ensure_lookup_table()
-            loops = BmEx.get_verts_loops_from_selection(bm)
+            # if area selected - clear it
+            cls.clear_selection_area(bm)
+            filling_type = cls.get_filling_type(bm)
+            # print(filling_type)
+            for task in cls.tasks_by_filling_type(bm, filling_type):
+                if task['levels'] > 0:
+                    for level in range(task['levels']):
+                        # print('current level: ', level)
+                        src_loop = cls.build_level(bm, task['source_loop'], task['dest_loop'], level, task['levels'])
+                        # print('next src_loop ', src_loop)
+            bm.to_mesh(context.object.data)
+            bm.free()
+            bpy.ops.object.mode_set(mode='EDIT')
+
+    @classmethod
+    def tasks_by_filling_type(cls, bm, filling_type):
+        # create list of tasks to fill the area (with dsta correction) from current selection
+        verts_selection = [vert for vert in bm.verts if vert.select]
+        active_vert = bm.select_history.active
+        tasks = []
+        if filling_type == 'TWO_LOOPS_SIDES_RECREATE_DEST':
+            task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
+            loops = BmEx.get_verts_loops_from_selection(verts_selection)
+            print(loops)
+
+
+            tasks.append(task)
+        elif filling_type == 'TO_CENTER_SIDES':
+            task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
+
+
+            tasks.append(task)
+        elif filling_type == 'TWO_LOOPS':
+            task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
+            loops = BmEx.get_verts_loops_from_selection(verts_selection)
             if len(loops) == 2:
                 src_loop = loops[0] if len(loops[0]) < len(loops[1]) else loops[1]
                 dest_loop = loops[0] if src_loop == loops[1] else loops[1]
                 # count levels with src and dest loops correction
                 src_loop, dest_loop, levels = cls.levels(src_loop, dest_loop)
-                # print('src_loop', src_loop, ' len = ', len(src_loop))
-                # print('dest_loop', dest_loop, ' len = ', len(dest_loop))
-                # print('levels', levels)
-                # return
-                if levels > 0:
-                    for level in range(levels):
-                        # print('current level: ', level)
-                        src_loop = cls.build_level(bm, src_loop, dest_loop, level, levels)
-                        # print('next src_loop ', src_loop)
-            bm.to_mesh(context.object.data)
-            bm.free()
-            bpy.ops.object.mode_set(mode='EDIT')
+                task = {'source_loop': src_loop, 'dest_loop': dest_loop, 'levels': levels}
+            tasks.append(task)
+        print(tasks)
+        return tasks
+
+    @classmethod
+    def clear_selection_area(cls, bm):
+        # clear selection if selected an area
+        verts_to_remove = [vert for vert in bm.verts if vert.select and len([edge for edge in vert.link_edges if edge.select]) == 4]
+        BmEx.remove_verts(bm, verts_to_remove)
+
+    @classmethod
+    def get_filling_type(cls, bm):
+        # find filing type and return this type and loops data
+        filing_type = None
+        verts_selection = [vert for vert in bm.verts if vert.select]
+        active_vert = bm.select_history.active
+        selection_is_closed_loop = BmEx.selection_is_closed_loop(verts_selection)
+        if selection_is_closed_loop:
+            if len(active_vert.link_edges) == 2:
+                # filling between two loops with sides (with deleting dest loop and recreating it with required vertex number)
+                filing_type = 'TWO_LOOPS_SIDES_RECREATE_DEST'
+            else:
+                # filling to center with sides
+                filing_type = 'TO_CENTER_SIDES'
+        if not filing_type:
+            # filling between two loops without sides
+            filing_type = 'TWO_LOOPS'
+        return (filing_type)
 
     @classmethod
     def levels(cls, src_loop, dest_loop):
@@ -922,28 +972,42 @@ class QuadBridges:
 
 class BmEx:
     @staticmethod
-    def get_verts_loops_from_selection(bm):
+    def get_verts_loops_from_selection(verts_selecton_list):
         # get the lists of the arranged vertex loops from selection
         loops = []
-        extreme_verts = [vert for vert in bm.verts if vert.select and __class__.vert_is_extreme_in_selection(vert)]
+        extreme_verts = [vert for vert in verts_selecton_list if vert.select and __class__.vert_is_extreme_in_selection(vert)]
         for vert in extreme_verts:
-            loop = [vert]
-            while vert:
-                next_edge = [edge for edge in vert.link_edges if edge.select and (edge.verts[0] not in loop or edge.verts[1] not in loop)]
-                if next_edge:
-                    vert = next_edge[0].verts[0] if next_edge[0].verts[0] not in loop else next_edge[0].verts[1]
-                    loop.append(vert)
-                    if vert in extreme_verts:
-                        extreme_verts.remove(vert)
-                else:
-                    break
+            extreme_verts.remove(vert)
+            for next_vert in [edge.other_vert(vert) for edge in vert.link_edges if edge.select]:
+                loop = []
+                loop.append(vert)
+                loop.append(next_vert)
+
+
+
+            # while vert:
+            #     next_edge = [edge for edge in vert.link_edges if edge.select and (edge.verts[0] not in loop or edge.verts[1] not in loop)]
+            #     if next_edge:
+            #         vert = next_edge[0].verts[0] if next_edge[0].verts[0] not in loop else next_edge[0].verts[1]
+            #         loop.append(vert)
+            #         if vert in extreme_verts:
+            #             extreme_verts.remove(vert)
+            #     else:
+            #         break
             loops.append(loop)
         return loops
 
     @staticmethod
     def vert_is_extreme_in_selection(vert):
-        vert_edges = [edge for edge in vert.link_edges if edge.select]
-        return True if len(vert_edges) == 1 else False
+        extreme = False
+        selected_edges = [edge for edge in vert.link_edges if edge.select]
+        if len(selected_edges) == 1:
+            # endpoint vert
+            extreme = True
+        elif len(selected_edges) == 2 and (len(vert.link_edges) == 4 or len(vert.link_faces) == 1):
+            # 90 degree angle
+            extreme = True
+        return extreme
 
     @staticmethod
     def loops_direction(loop1, loop2):
@@ -957,6 +1021,22 @@ class BmEx:
                 return True
             else:
                 return False
+
+    @staticmethod
+    def selection_is_closed_loop(selection_verts):
+        # check if selection is a closed verts loop
+        is_closed_loop = True
+        for vert in selection_verts:
+            if len([edge for edge in vert.link_edges if edge.select]) != 2:
+                is_closed_loop = False
+                break
+        return is_closed_loop
+
+    @staticmethod
+    def remove_verts(bm, verts_list):
+        # remove verts by verts_list
+        for vert in verts_list:
+            bm.verts.remove(vert)
 
 
 class QuadBridgePanel(bpy.types.Panel):
