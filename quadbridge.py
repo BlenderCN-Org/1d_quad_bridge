@@ -44,7 +44,7 @@ class QuadBridge(ABC):
                 if task['levels'] > 0:
                     for level in range(task['levels']):
                         # print('current level: ', level)
-                        src_loop = cls.build_level(bm, task['source_loop'], task['dest_loop'], level, task['levels'])
+                        task['source_loop'] = cls.build_level(bm, task['source_loop'], task['dest_loop'], level, task['levels'])
                         # print('next src_loop ', src_loop)
             bm.to_mesh(context.object.data)
             bm.free()
@@ -65,12 +65,15 @@ class QuadBridge(ABC):
             tasks.append(task)
         elif filling_type == 'TO_CENTER_SIDES':
             task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
-
+            loops = BmEx.get_verts_loops_from_selection(verts_selection)
+            print(loops)
 
             tasks.append(task)
         elif filling_type == 'TWO_LOOPS':
             task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
+            print(loops)
+
             if len(loops) == 2:
                 src_loop = loops[0] if len(loops[0]) < len(loops[1]) else loops[1]
                 dest_loop = loops[0] if src_loop == loops[1] else loops[1]
@@ -975,14 +978,45 @@ class BmEx:
     def get_verts_loops_from_selection(verts_selecton_list):
         # get the lists of the arranged vertex loops from selection
         loops = []
-        extreme_verts = [vert for vert in verts_selecton_list if vert.select and __class__.vert_is_extreme_in_selection(vert)]
+        extreme_verts = [vert for vert in verts_selecton_list if vert.select and __class__.is_vert_extreme(vert)]
         for vert in extreme_verts:
+            # print('extreme verts', extreme_verts)
+            # print('extreme vert', vert)
             extreme_verts.remove(vert)
-            for next_vert in [edge.other_vert(vert) for edge in vert.link_edges if edge.select]:
-                loop = []
-                loop.append(vert)
-                loop.append(next_vert)
+            # for next_vert in [edge.other_vert(vert) for edge in vert.link_edges if edge.select]:
+            for edge in [edge for edge in vert.link_edges if edge.select]:
+                if extreme_verts:
+                    current_loop = [vert]
+                    next_vert = edge.other_vert(vert)
+                    while next_vert:
+                        current_loop.append(next_vert)
+                        selected_edges = [edge for edge in next_vert.link_edges if edge.select]
+                        # print(selected_edges)
+                        if __class__.is_vert_extreme_endpoint(next_vert):
+                            # comes to endpoint
+                            loops.append(current_loop)
+                            extreme_verts.remove(next_vert)
+                            next_vert = None
+                        else:
+                            if __class__.is_vert_extreme_angle(next_vert):
+                                # comes through the 90 degree corner - fihish this loop and statr new loop
+                                if next_vert in extreme_verts:
+                                    extreme_verts.remove(next_vert)
+                                    loops.append(current_loop)
+                                    next_edge = [edge for edge in selected_edges if (edge.verts[0] not in current_loop or edge.verts[1] not in current_loop)][0]
+                                    current_loop = [next_vert]
+                                    next_vert = next_edge.other_vert(next_vert)
+                                else:
+                                    loops.append(current_loop)
+                                    break
+                            else:
+                                # continue to next vert
+                                next_edge = [edge for edge in selected_edges if (edge.verts[0] not in current_loop or edge.verts[1] not in current_loop)][0]
+                                next_vert = next_edge.other_vert(next_vert)
 
+
+
+                # loops.append(current_loop)
 
 
             # while vert:
@@ -994,20 +1028,26 @@ class BmEx:
             #             extreme_verts.remove(vert)
             #     else:
             #         break
-            loops.append(loop)
+
+            # loops.append(loop)
         return loops
 
     @staticmethod
-    def vert_is_extreme_in_selection(vert):
-        extreme = False
+    def is_vert_extreme(vert):
+        # check is vert is extreme
+        return __class__.is_vert_extreme_angle(vert) or __class__.is_vert_extreme_endpoint(vert)
+
+    @staticmethod
+    def is_vert_extreme_endpoint(vert):
+        # check if vert is the endpoint extreme
         selected_edges = [edge for edge in vert.link_edges if edge.select]
-        if len(selected_edges) == 1:
-            # endpoint vert
-            extreme = True
-        elif len(selected_edges) == 2 and (len(vert.link_edges) == 4 or len(vert.link_faces) == 1):
-            # 90 degree angle
-            extreme = True
-        return extreme
+        return True if len(selected_edges) == 1 else False
+
+    @staticmethod
+    def is_vert_extreme_angle(vert):
+        # check if vert is the 90 degree angle extreme
+        selected_edges = [edge for edge in vert.link_edges if edge.select]
+        return True if (len(selected_edges) == 2 and (len(vert.link_edges) == 4 or len(vert.link_faces) == 1)) else False
 
     @staticmethod
     def loops_direction(loop1, loop2):
