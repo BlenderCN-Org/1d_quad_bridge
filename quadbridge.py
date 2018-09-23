@@ -57,11 +57,27 @@ class QuadBridge(ABC):
         active_vert = bm.select_history.active
         tasks = []
         if filling_type == 'TWO_LOOPS_SIDES_RECREATE_DEST':
-            task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
+            task = {'source_loop': [], 'dest_loop': [], 'left_side': [], 'right_side': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
-            print(loops)
+            # print(loops)
+            task['dest_loop'] = [loop for loop in loops if active_vert in loop][0]
+            task['source_loop'] = [loop for loop in loops if task['dest_loop'][0] not in loop and task['dest_loop'][-1] not in loop][0]
+            if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
+                # correct source_loop direction to dest_loop direction
+                if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
+                    task['source_loop'].reverse()
+                # get left and right sides
+                task['left_side'] = [loop for loop in loops if task['dest_loop'][0] in loop and task['source_loop'][0] in loop][0]
+                task['right_side'] = [loop for loop in loops if task['dest_loop'][-1] in loop and task['source_loop'][-1] in loop][0]
+                # count levels number
+                task['levels'] = int((len(task['right_side']) - 1) / 2)
+                # recreate dest_loop according to levels number
+                BmEx.remove_verts(bm, task['dest_loop'][1:-1])
+                BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']) - 2, select=True)
 
 
+                task['levels'] = 0
+            print(task)
             tasks.append(task)
         elif filling_type == 'TO_CENTER_SIDES':
             task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
@@ -72,8 +88,7 @@ class QuadBridge(ABC):
         elif filling_type == 'TWO_LOOPS':
             task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
-            print(loops)
-
+            # print(loops)
             if len(loops) == 2:
                 src_loop = loops[0] if len(loops[0]) < len(loops[1]) else loops[1]
                 dest_loop = loops[0] if src_loop == loops[1] else loops[1]
@@ -203,6 +218,10 @@ class QuadBridge(ABC):
     def block_level_power(cls):
         # must be integer to build bridges
         return int(cls.block_dest_edges() / cls.block_src_edges())
+
+    @classmethod
+    def dest_loop_verts_number(cls, source_loop_verts_number, levels):
+        return (source_loop_verts_number - 1) * cls.block_level_power() ** levels + 1
 
 
 class QuadBirdge_3_5(QuadBridge):
@@ -999,37 +1018,21 @@ class BmEx:
                             next_vert = None
                         else:
                             if __class__.is_vert_extreme_angle(next_vert):
-                                # comes through the 90 degree corner - fihish this loop and statr new loop
                                 if next_vert in extreme_verts:
+                                    # comes through the 90 degree corner - finish this loop and start new loop
                                     extreme_verts.remove(next_vert)
                                     loops.append(current_loop)
                                     next_edge = [edge for edge in selected_edges if (edge.verts[0] not in current_loop or edge.verts[1] not in current_loop)][0]
                                     current_loop = [next_vert]
                                     next_vert = next_edge.other_vert(next_vert)
                                 else:
+                                    # comes to angle-vert in closed loop from which starts - finish current loop and stop
                                     loops.append(current_loop)
                                     break
                             else:
                                 # continue to next vert
                                 next_edge = [edge for edge in selected_edges if (edge.verts[0] not in current_loop or edge.verts[1] not in current_loop)][0]
                                 next_vert = next_edge.other_vert(next_vert)
-
-
-
-                # loops.append(current_loop)
-
-
-            # while vert:
-            #     next_edge = [edge for edge in vert.link_edges if edge.select and (edge.verts[0] not in loop or edge.verts[1] not in loop)]
-            #     if next_edge:
-            #         vert = next_edge[0].verts[0] if next_edge[0].verts[0] not in loop else next_edge[0].verts[1]
-            #         loop.append(vert)
-            #         if vert in extreme_verts:
-            #             extreme_verts.remove(vert)
-            #     else:
-            #         break
-
-            # loops.append(loop)
         return loops
 
     @staticmethod
@@ -1077,6 +1080,16 @@ class BmEx:
         # remove verts by verts_list
         for vert in verts_list:
             bm.verts.remove(vert)
+
+    @staticmethod
+    def create_multiedge(bm, vert1, vert2, cuts, select=False):
+        # create edge between two verts, subdivided with sub vertexes
+        edge = bm.edges.new((vert1, vert2))
+        cutting = bmesh.ops.subdivide_edges(bm, edges=[edge], cuts=cuts)
+        if select:
+            for element in cutting['geom']:
+                # if isinstance(element, bmesh.types.BMVert):
+                element.select = True
 
 
 class QuadBridgePanel(bpy.types.Panel):
