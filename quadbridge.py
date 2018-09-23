@@ -22,6 +22,7 @@ class QuadBridge(ABC):
 
     block_src_verts = None
     block_dest_verts = None
+    block_side_verts = None
 
     @classmethod
     def make_bridge(cls, context):
@@ -44,7 +45,13 @@ class QuadBridge(ABC):
                 if task['levels'] > 0:
                     for level in range(task['levels']):
                         # print('current level: ', level)
-                        task['source_loop'] = cls.build_level(bm, task['source_loop'], task['dest_loop'], level, task['levels'])
+                        task['source_loop'] = cls.build_level(bm, task['source_loop'],
+                                                              task['dest_loop'],
+                                                              task['from_side'] if 'from_side' in task else [],
+                                                              task['to_side'] if 'to_side' in task else [],
+                                                              level,
+                                                              task['levels']
+                                                              )
                         # print('next src_loop ', src_loop)
             bm.to_mesh(context.object.data)
             bm.free()
@@ -181,9 +188,12 @@ class QuadBridge(ABC):
         return length * (2 ** (levels - level)) / (2 ** levels - 1)
 
     @classmethod
-    def build_level(cls, bm, src_loop, dest_loop, level, levels):
+    def build_level(cls, bm, src_loop, dest_loop, from_side, to_side, level, levels):
         new_src_loop = []
         prev_block = None
+        if from_side and to_side:
+            prev_block = cls.block_data_from_sides(from_side[level * cls.block_side_edges():level * cls.block_side_edges() + cls.block_side_verts],
+                                                   to_side[level * cls.block_side_edges():level * cls.block_side_edges() + cls.block_side_verts])
         steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
         # print('steps ', steps_on_level)
         for step in range(steps_on_level):
@@ -207,6 +217,11 @@ class QuadBridge(ABC):
     def block(cls, src_loop, dest_loop, prev_block, level, levels):
         # make block verts here
         # returns list with current block verts
+        return []
+
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        # return blosk with verts getted from sides (on current level)
         return []
 
     @classmethod
@@ -271,6 +286,23 @@ class QuadBirdge_3_5(QuadBridge):
                 __class__.v10(src_loop, dest_loop, level, levels),
                 __class__.v11(src_loop, dest_loop, level, levels),
                 __class__.v12(src_loop, dest_loop, level, levels)
+                ]
+
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [from_side[0],
+                None,
+                to_side[0],
+                from_side[1],
+                None,
+                None,
+                None,
+                to_side[1],
+                from_side[2],
+                None,
+                None,
+                None,
+                to_side[2]
                 ]
 
     @staticmethod
@@ -427,6 +459,20 @@ class QuadBirdge_2_4(QuadBridge):
                 __class__.v9(src_loop, dest_loop, level, levels)
                 ]
 
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [from_side[0],
+                to_side[0],
+                from_side[1],
+                None,
+                None,
+                to_side[1],
+                from_side[2],
+                None,
+                None,
+                to_side[2]
+                ]
+
     @staticmethod
     def v0(src_loop):
         return src_loop[0]
@@ -549,6 +595,16 @@ class QuadBirdge_2_2(QuadBridge):
                 __class__.v5(src_loop, dest_loop, level, levels)
                 ]
 
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [from_side[0],
+                to_side[0],
+                from_side[1],
+                to_side[1],
+                from_side[2],
+                to_side[2]
+                ]
+
     @staticmethod
     def v0(src_loop):
         return src_loop[0]
@@ -643,6 +699,25 @@ class QuadBirdge_1_3(QuadBridge):
                 __class__.v12(src_loop, dest_loop, level, levels),
                 __class__.v13(src_loop, dest_loop, level, levels),
                 __class__.v14(src_loop, dest_loop, level, levels)
+                ]
+
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [from_side[0],
+                None,
+                to_side[0],
+                from_side[1],
+                None,
+                None,
+                None,
+                None,
+                None,
+                to_side[1],
+                from_side[2],
+                None,
+                None,
+                None,
+                to_side[2]
                 ]
 
     @staticmethod
@@ -827,6 +902,27 @@ class QuadBirdge_3_7(QuadBridge):
                 __class__.v14(src_loop, dest_loop, level, levels),
                 __class__.v15(src_loop, dest_loop, level, levels),
                 __class__.v16(src_loop, dest_loop, level, levels)
+                ]
+
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [from_side[0],
+                None,
+                to_side[0],
+                from_side[1],
+                None,
+                None,
+                None,
+                None,
+                None,
+                to_side[1],
+                from_side[2],
+                None,
+                None,
+                None,
+                None,
+                None,
+                to_side[2]
                 ]
 
     @staticmethod
