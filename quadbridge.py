@@ -63,17 +63,21 @@ class QuadBridge(ABC):
             task['dest_loop'] = [loop for loop in loops if active_vert in loop][0]
             task['source_loop'] = [loop for loop in loops if task['dest_loop'][0] not in loop and task['dest_loop'][-1] not in loop][0]
             if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
+                # count levels number
+                any_side = [loop for loop in loops if loop != task['dest_loop'] and loop != task['source_loop']][0]
+                task['levels'] = int((len(any_side) - 1) / cls.block_side_edges())
+                print('levels', task['levels'])
+                # recreate dest_loop according to levels number
+                BmEx.remove_verts(bm, task['dest_loop'][1:-1])
+                task['dest_loop'] = BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']), select=True)
                 # correct source_loop direction to dest_loop direction
                 if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
                     task['source_loop'].reverse()
                 # get left and right sides
                 task['left_side'] = [loop for loop in loops if task['dest_loop'][0] in loop and task['source_loop'][0] in loop][0]
                 task['right_side'] = [loop for loop in loops if task['dest_loop'][-1] in loop and task['source_loop'][-1] in loop][0]
-                # count levels number
-                task['levels'] = int((len(task['right_side']) - 1) / 2)
-                # recreate dest_loop according to levels number
-                BmEx.remove_verts(bm, task['dest_loop'][1:-1])
-                BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']) - 2, select=True)
+                print('source_loop', task['source_loop'])
+                print('dest_loop', task['dest_loop'])
 
 
                 task['levels'] = 0
@@ -215,6 +219,10 @@ class QuadBridge(ABC):
         return cls.block_dest_verts - 1
 
     @classmethod
+    def block_side_edges(cls):
+        return cls.block_side_verts - 1
+
+    @classmethod
     def block_level_power(cls):
         # must be integer to build bridges
         return int(cls.block_dest_edges() / cls.block_src_edges())
@@ -228,6 +236,7 @@ class QuadBirdge_3_5(QuadBridge):
 
     block_src_verts = 3
     block_dest_verts = 5
+    block_side_verts = 3
 
     @classmethod
     def fillBlock(cls, bm, block_verts):
@@ -386,6 +395,7 @@ class QuadBirdge_2_4(QuadBridge):
 
     block_src_verts = 2
     block_dest_verts = 4
+    block_side_verts = 3
 
     @classmethod
     def fillBlock(cls, bm, block_verts):
@@ -514,6 +524,7 @@ class QuadBirdge_2_2(QuadBridge):
 
     block_src_verts = 2
     block_dest_verts = 2
+    block_side_verts = 3
 
     @classmethod
     def fillBlock(cls, bm, block_verts):
@@ -593,6 +604,7 @@ class QuadBirdge_1_3(QuadBridge):
 
     block_src_verts = 3
     block_dest_verts = 5
+    block_side_verts = 3
 
     @classmethod
     def fillBlock(cls, bm, block_verts):
@@ -773,6 +785,7 @@ class QuadBirdge_3_7(QuadBridge):
 
     block_src_verts = 3
     block_dest_verts = 7
+    block_side_verts = 3
 
     @classmethod
     def fillBlock(cls, bm, block_verts):
@@ -1083,13 +1096,22 @@ class BmEx:
 
     @staticmethod
     def create_multiedge(bm, vert1, vert2, cuts, select=False):
-        # create edge between two verts, subdivided with sub vertexes
-        edge = bm.edges.new((vert1, vert2))
-        cutting = bmesh.ops.subdivide_edges(bm, edges=[edge], cuts=cuts)
-        if select:
-            for element in cutting['geom']:
-                # if isinstance(element, bmesh.types.BMVert):
-                element.select = True
+        # create edges loop between two verts consists of cuts verts (including v1 and v2)
+        direction = vert2.co - vert1.co
+        length = direction.length / (cuts - 1)
+        direction.normalize()
+        loop = [vert1]
+        next_vert = vert1
+        for i in range(cuts - 2):
+            next_vert = bm.verts.new((next_vert.co + direction * length))
+            next_edge = bm.edges.new((loop[-1], next_vert))
+            loop.append(next_vert)
+            if select:
+                next_vert.select = True
+                next_edge.select = True
+        bm.edges.new((loop[-1], vert2))
+        loop.append(vert2)
+        return loop
 
 
 class QuadBridgePanel(bpy.types.Panel):
