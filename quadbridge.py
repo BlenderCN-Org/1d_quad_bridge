@@ -57,36 +57,41 @@ class QuadBridge(ABC):
         active_vert = bm.select_history.active
         tasks = []
         if filling_type == 'TWO_LOOPS_SIDES_RECREATE_DEST':
-            task = {'source_loop': [], 'dest_loop': [], 'left_side': [], 'right_side': [], 'levels': 0}
+            task = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
             # print(loops)
             task['dest_loop'] = [loop for loop in loops if active_vert in loop][0]
             task['source_loop'] = [loop for loop in loops if task['dest_loop'][0] not in loop and task['dest_loop'][-1] not in loop][0]
+            loops.remove(task['dest_loop'])
+            loops.remove(task['source_loop'])
             if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
                 # count levels number
                 any_side = [loop for loop in loops if loop != task['dest_loop'] and loop != task['source_loop']][0]
                 task['levels'] = int((len(any_side) - 1) / cls.block_side_edges())
-                print('levels', task['levels'])
+                # print('levels', task['levels'])
                 # recreate dest_loop according to levels number
                 BmEx.remove_verts(bm, task['dest_loop'][1:-1])
                 task['dest_loop'] = BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']), select=True)
                 # correct source_loop direction to dest_loop direction
                 if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
                     task['source_loop'].reverse()
-                # get left and right sides
-                task['left_side'] = [loop for loop in loops if task['dest_loop'][0] in loop and task['source_loop'][0] in loop][0]
-                task['right_side'] = [loop for loop in loops if task['dest_loop'][-1] in loop and task['source_loop'][-1] in loop][0]
-                print('source_loop', task['source_loop'])
-                print('dest_loop', task['dest_loop'])
-
-
-                task['levels'] = 0
-            print(task)
+                # get 'from' and 'to' sides
+                task['from_side'] = [loop for loop in loops if task['dest_loop'][0] and loop and task['source_loop'][0] in loop][0]
+                task['to_side'] = [loop for loop in loops if task['dest_loop'][-1] and loop and task['source_loop'][-1] in loop][0]
+                if not task['source_loop'][0] == task['from_side'][0]:
+                    task['from_side'].reverse()
+                if not task['source_loop'][-1] == task['to_side'][0]:
+                    task['to_side'].reverse()
+            # for elem, value in task.items():
+            #     print(elem, value)
             tasks.append(task)
         elif filling_type == 'TO_CENTER_SIDES':
             task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
             print(loops)
+
+
+            
 
             tasks.append(task)
         elif filling_type == 'TWO_LOOPS':
@@ -1095,14 +1100,14 @@ class BmEx:
             bm.verts.remove(vert)
 
     @staticmethod
-    def create_multiedge(bm, vert1, vert2, cuts, select=False):
-        # create edges loop between two verts consists of cuts verts (including v1 and v2)
+    def create_multiedge(bm, vert1, vert2, verts_count, select=False):
+        # create edges loop between two verts consists of verts_count verts (including v1 and v2)
         direction = vert2.co - vert1.co
-        length = direction.length / (cuts - 1)
+        length = direction.length / (verts_count - 1)
         direction.normalize()
         loop = [vert1]
         next_vert = vert1
-        for i in range(cuts - 2):
+        for i in range(verts_count - 2):
             next_vert = bm.verts.new((next_vert.co + direction * length))
             next_edge = bm.edges.new((loop[-1], next_vert))
             loop.append(next_vert)
