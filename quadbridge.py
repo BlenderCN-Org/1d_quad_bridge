@@ -83,20 +83,18 @@ class QuadBridge(ABC):
                 if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
                     task['source_loop'].reverse()
                 # get 'from' and 'to' sides
-                task['from_side'] = [loop for loop in loops if task['dest_loop'][0] and loop and task['source_loop'][0] in loop][0]
-                task['to_side'] = [loop for loop in loops if task['dest_loop'][-1] and loop and task['source_loop'][-1] in loop][0]
+                task['from_side'] = [loop for loop in loops if task['dest_loop'][0] in loop and task['source_loop'][0] in loop][0]
+                task['to_side'] = [loop for loop in loops if task['dest_loop'][-1] in loop and task['source_loop'][-1] in loop][0]
                 if not task['source_loop'][0] == task['from_side'][0]:
                     task['from_side'].reverse()
                 if not task['source_loop'][-1] == task['to_side'][0]:
                     task['to_side'].reverse()
+                # additional check from- and to- sides
+                if ((task['source_loop'][0]).co - (task['from_side'][1]).co).length > ((task['source_loop'][0]).co - (task['to_side'][1]).co).length:
+                    task['to_side'], task['from_side'] = task['from_side'], task['to_side']
 
-                # временно пока не разберусь с высотой
-                task['to_side'], task['from_side'] = task['from_side'], task['to_side']
-                # task['to_side'].reverse()
-                # task['from_side'].reverse()
-
-            for elem, value in task.items():
-                print(elem, value)
+            # for elem, value in task.items():
+            #     print(elem, value)
 
             tasks.append(task)
         elif filling_type == 'TO_CENTER_SIDES':
@@ -197,6 +195,7 @@ class QuadBridge(ABC):
         if from_side and to_side:
             first_last_block = cls.block_data_from_sides(from_side[level * cls.block_side_edges():level * cls.block_side_edges() + cls.block_side_verts],
                                                    to_side[level * cls.block_side_edges():level * cls.block_side_edges() + cls.block_side_verts])
+            # print('first_last_block', first_last_block)
             prev_block = first_last_block
             # print('f_l_block', first_last_block)
             # print('v1', from_side[level * cls.block_side_edges() + cls.block_side_verts - 1])
@@ -301,19 +300,19 @@ class QuadBirdge_3_5(QuadBridge):
 
     @classmethod
     def block_data_from_sides(cls, from_side, to_side):
-        return [from_side[0],
+        return [to_side[0],
                 None,
-                to_side[0],
-                from_side[1],
-                None,
-                None,
-                None,
+                from_side[0],
                 to_side[1],
-                from_side[2],
                 None,
                 None,
                 None,
-                to_side[2]
+                from_side[1],
+                to_side[2],
+                None,
+                None,
+                None,
+                from_side[2]
                 ]
 
     @staticmethod
@@ -477,16 +476,16 @@ class QuadBirdge_2_4(QuadBridge):
 
     @classmethod
     def block_data_from_sides(cls, from_side, to_side):
-        return [from_side[0],
-                to_side[0],
-                from_side[1],
-                None,
-                None,
+        return [to_side[0],
+                from_side[0],
                 to_side[1],
-                from_side[2],
                 None,
                 None,
-                to_side[2]
+                from_side[1],
+                to_side[2],
+                None,
+                None,
+                from_side[2]
                 ]
 
     @staticmethod
@@ -618,12 +617,12 @@ class QuadBirdge_2_2(QuadBridge):
 
     @classmethod
     def block_data_from_sides(cls, from_side, to_side):
-        return [from_side[0],
-                to_side[0],
-                from_side[1],
+        return [to_side[0],
+                from_side[0],
                 to_side[1],
-                from_side[2],
-                to_side[2]
+                from_side[1],
+                to_side[2],
+                from_side[2]
                 ]
 
     @staticmethod
@@ -729,21 +728,21 @@ class QuadBirdge_1_3(QuadBridge):
 
     @classmethod
     def block_data_from_sides(cls, from_side, to_side):
-        return [from_side[0],
+        return [to_side[0],
                 None,
-                to_side[0],
-                from_side[1],
-                None,
-                None,
-                None,
-                None,
-                None,
+                from_side[0],
                 to_side[1],
-                from_side[2],
                 None,
                 None,
                 None,
-                to_side[2]
+                None,
+                None,
+                from_side[1],
+                to_side[2],
+                None,
+                None,
+                None,
+                from_side[2]
                 ]
 
     @staticmethod
@@ -937,23 +936,23 @@ class QuadBirdge_3_7(QuadBridge):
 
     @classmethod
     def block_data_from_sides(cls, from_side, to_side):
-        return [from_side[0],
+        return [to_side[0],
                 None,
-                to_side[0],
-                from_side[1],
-                None,
-                None,
-                None,
-                None,
-                None,
+                from_side[0],
                 to_side[1],
-                from_side[2],
                 None,
                 None,
                 None,
                 None,
                 None,
-                to_side[2]
+                from_side[1],
+                to_side[2],
+                None,
+                None,
+                None,
+                None,
+                None,
+                from_side[2]
                 ]
 
     @staticmethod
