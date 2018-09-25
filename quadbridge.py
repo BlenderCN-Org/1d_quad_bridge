@@ -13,6 +13,7 @@
 import bpy
 import bmesh
 import bpy.utils.previews
+import copy
 import os
 from inspect import getsourcefile
 from abc import ABC, abstractmethod
@@ -42,6 +43,8 @@ class QuadBridge(ABC):
             filling_type = cls.get_filling_type(bm)
             # print(filling_type)
             for task in cls.tasks_by_filling_type(bm, filling_type):
+                # for elem, value in task.items():
+                #     print(elem, value)
                 if task['levels'] > 0:
                     for level in range(task['levels']):
                         # print('current level: ', level)
@@ -52,7 +55,6 @@ class QuadBridge(ABC):
                                                               level,
                                                               task['levels']
                                                               )
-                        # print('next src_loop ', src_loop)
             bm.to_mesh(context.object.data)
             bm.free()
             bpy.ops.object.mode_set(mode='EDIT')
@@ -66,46 +68,76 @@ class QuadBridge(ABC):
         if filling_type == 'TWO_LOOPS_SIDES_RECREATE_DEST':
             task = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
-            # print(loops)
-            task['dest_loop'] = [loop for loop in loops if active_vert in loop][0]
-            task['source_loop'] = [loop for loop in loops if task['dest_loop'][0] not in loop and task['dest_loop'][-1] not in loop][0]
-            loops.remove(task['dest_loop'])
-            loops.remove(task['source_loop'])
-            if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
-                # count levels number
-                any_side = [loop for loop in loops if loop != task['dest_loop'] and loop != task['source_loop']][0]
-                task['levels'] = int((len(any_side) - 1) / cls.block_side_edges())
-                # print('levels', task['levels'])
-                # recreate dest_loop according to levels number
-                BmEx.remove_verts(bm, task['dest_loop'][1:-1])
-                task['dest_loop'] = BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']), select=True)
-                # correct source_loop direction to dest_loop direction
-                if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
-                    task['source_loop'].reverse()
-                # get 'from' and 'to' sides
-                task['from_side'] = [loop for loop in loops if task['dest_loop'][0] in loop and task['source_loop'][0] in loop][0]
-                task['to_side'] = [loop for loop in loops if task['dest_loop'][-1] in loop and task['source_loop'][-1] in loop][0]
-                if not task['source_loop'][0] == task['from_side'][0]:
-                    task['from_side'].reverse()
-                if not task['source_loop'][-1] == task['to_side'][0]:
-                    task['to_side'].reverse()
-                # additional check from- and to- sides
-                if ((task['source_loop'][0]).co - (task['from_side'][1]).co).length > ((task['source_loop'][0]).co - (task['to_side'][1]).co).length:
-                    task['to_side'], task['from_side'] = task['from_side'], task['to_side']
-
-            # for elem, value in task.items():
-            #     print(elem, value)
-
+            if len(loops) == 4:
+                # print(loops)
+                task['dest_loop'] = [loop for loop in loops if active_vert in loop][0]
+                task['source_loop'] = [loop for loop in loops if task['dest_loop'][0] not in loop and task['dest_loop'][-1] not in loop][0]
+                loops.remove(task['dest_loop'])
+                loops.remove(task['source_loop'])
+                if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
+                    # count levels number
+                    task['levels'] = int((len(loops[0]) - 1) / cls.block_side_edges())
+                    # print('levels', task['levels'])
+                    # recreate dest_loop according to levels number
+                    BmEx.remove_verts(bm, task['dest_loop'][1:-1])
+                    task['dest_loop'] = BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']), select=True)
+                    # correct source_loop direction to dest_loop direction
+                    if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
+                        task['source_loop'].reverse()
+                    # get 'from' and 'to' sides
+                    task['from_side'] = [loop for loop in loops if task['dest_loop'][0] in loop and task['source_loop'][0] in loop][0]
+                    task['to_side'] = [loop for loop in loops if task['dest_loop'][-1] in loop and task['source_loop'][-1] in loop][0]
+                    if not task['source_loop'][0] == task['from_side'][0]:
+                        task['from_side'].reverse()
+                    if not task['source_loop'][-1] == task['to_side'][0]:
+                        task['to_side'].reverse()
+                    # additional check from- and to- sides (maybe not needed)
+                    if ((task['source_loop'][0]).co - (task['from_side'][1]).co).length > ((task['source_loop'][0]).co - (task['to_side'][1]).co).length:
+                        task['to_side'], task['from_side'] = task['from_side'], task['to_side']
             tasks.append(task)
         elif filling_type == 'TO_CENTER_SIDES':
-            task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
-            print(loops)
-
-
-            
-
-            tasks.append(task)
+            task_l = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
+            task_r = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
+            if len(loops) == 4:
+                # source loop from left to center
+                task_l['source_loop'] = [loop for loop in loops if active_vert in loop][0]
+                loops.remove(task_l['source_loop'])
+                # source loop from right to center
+                task_r['source_loop'] = [loop for loop in loops if task_l['source_loop'][0] not in loop and task_l['source_loop'][-1] not in loop][0]
+                loops.remove(task_r['source_loop'])
+                if len(task_l['source_loop']) >= cls.block_src_verts and (len(task_l['source_loop']) - 1) % cls.block_src_edges() == 0:
+                    if len(loops[0]) % 2 == 1:
+                        # levels for bot tasks
+                        task_l['levels'] = int(((len(loops[0]) - 1) / cls.block_side_edges()) / 2)
+                        task_r['levels'] = task_l['levels']
+                        # dest loop for both tasks
+                        task_l['dest_loop'] = BmEx.create_multiedge(bm,
+                                                          loops[0][int(len(loops[0]) / 2)],
+                                                          loops[1][int(len(loops[1]) / 2)],
+                                                          cls.dest_loop_verts_number(len(task_l['source_loop']), task_l['levels']),
+                                                          select=True)
+                        task_r['dest_loop'] = copy.copy(task_l['dest_loop'])
+                        # task_r['dest_loop'].reverse()
+                        if not BmEx.loops_direction(task_l['source_loop'], task_l['dest_loop']):
+                            task_l['dest_loop'].reverse()
+                        if not BmEx.loops_direction(task_r['source_loop'], task_r['dest_loop']):
+                            task_r['dest_loop'].reverse()
+                        # from- and to- sides for both tasks
+                        task_l['from_side'] = [loop for loop in loops if task_l['dest_loop'][0] in loop and task_l['source_loop'][0] in loop][0]
+                        if not task_l['source_loop'][0] == task_l['from_side'][0]:
+                            task_l['from_side'].reverse()
+                        task_l['to_side'] = [loop for loop in loops if task_l['dest_loop'][-1] in loop and task_l['source_loop'][-1] in loop][0]
+                        if not task_l['source_loop'][-1] == task_l['to_side'][0]:
+                            task_l['to_side'].reverse()
+                        task_r['from_side'] = [copy.copy(loop) for loop in loops if task_r['dest_loop'][0] in loop and task_r['source_loop'][0] in loop][0]
+                        if not task_r['source_loop'][0] == task_r['from_side'][0]:
+                            task_r['from_side'].reverse()
+                        task_r['to_side'] = [copy.copy(loop) for loop in loops if task_r['dest_loop'][-1] in loop and task_r['source_loop'][-1] in loop][0]
+                        if not task_r['source_loop'][-1] == task_r['to_side'][0]:
+                            task_r['to_side'].reverse()
+            tasks.append(task_l)
+            tasks.append(task_r)
         elif filling_type == 'TWO_LOOPS':
             task = {'source_loop': [], 'dest_loop': [], 'levels': 0}
             loops = BmEx.get_verts_loops_from_selection(verts_selection)
@@ -216,6 +248,7 @@ class QuadBridge(ABC):
             for i, vert in enumerate(prev_block):
                 if vert:
                     prev_block[i] = vert if isinstance(vert, bmesh.types.BMVert) else bm.verts.new([vert.x, vert.y, vert.z])
+                    prev_block[i].select = True
             block_top_line = cls.fillBlock(bm, prev_block)
             # append new_src_loop
             if not new_src_loop:
@@ -1147,6 +1180,7 @@ class BmEx:
         # get the lists of the arranged vertex loops from selection
         loops = []
         extreme_verts = [vert for vert in verts_selecton_list if vert.select and __class__.is_vert_extreme(vert)]
+        # print('extreme verts', extreme_verts)
         for vert in extreme_verts:
             # print('extreme verts', extreme_verts)
             # print('extreme vert', vert)
@@ -1273,6 +1307,7 @@ class QuadBridgeOp(bpy.types.Operator):
 
     def execute(self, context):
         QuadBridges.bridge(self.bridge_id, context)
+        bpy.ops.mesh.normals_make_consistent(inside=False)
         return {'FINISHED'}
 
 
