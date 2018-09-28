@@ -43,11 +43,11 @@ class QuadBridge(ABC):
             filling_type = cls.get_filling_type(bm)
             # print(filling_type)
             for task in cls.tasks_by_filling_type(bm, filling_type):
-                # for elem, value in task.items():
-                #     print(elem, value)
+                for elem, value in task.items():
+                    print(elem, value)
                 if task['levels'] > 0:
                     for level in range(task['levels']):
-                        # print('current level: ', level)
+                        print('current level: ', level)
                         task['source_loop'] = cls.build_level(bm, task['source_loop'],
                                                               task['dest_loop'],
                                                               task['from_side'] if 'from_side' in task else [],
@@ -66,30 +66,21 @@ class QuadBridge(ABC):
         active_vert = bm.select_history.active
         tasks = []
         if filling_type == 'TWO_LOOPS_SIDES_RECREATE_DEST':
-            task = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
             loops_raw = BmEx.get_verts_loops_from_selection(verts_selection)
             if len(loops_raw) == 4:
                 loops = cls.analyze_loops(loops_raw, active_vert)
-                # print(loops)
-                grid = cls.get_grid(bm, verts_selection, loops['source_loop'], loops['dest_loop'], loops['from_side'], loops['to_side'])
-
-                for intermediate_dest_loop in grid['horizontal']:
-                    pass
-
-                task['source_loop'] = loops['source_loop']
-                if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
-                    task['dest_loop'] = loops['dest_loop']
-                    task['from_side'] = loops['from_side']
-                    task['to_side'] = loops['to_side']
-                    # count levels number
-                    task['levels'] = int((len(task['from_side']) - 1) / cls.block_side_edges())
-                    # recreate dest_loop according to levels number
-                    # BmEx.remove_verts(bm, task['dest_loop'][1:-1])
-                    # task['dest_loop'] = BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']), select=True)
-                    # # correct source_loop direction to dest_loop direction
-                    # if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
-                    #     task['source_loop'].reverse()
-            tasks.append(task)
+                if len(loops['source_loop']) >= cls.block_src_verts and (len(loops['source_loop']) - 1) % cls.block_src_edges() == 0:
+                    grid = cls.get_grid(bm, verts_selection, loops['source_loop'], loops['dest_loop'], loops['from_side'], loops['to_side'])
+                    level = 0
+                    for source_loop, dest_loop in zip(grid['horizontal'], grid['horizontal'][1:]):
+                        task = {'source_loop': source_loop,
+                                'dest_loop': dest_loop,
+                                'from_side': loops['from_side'][level * cls.block_side_edges():],
+                                'to_side': loops['to_side'][level * cls.block_side_edges():],
+                                'levels': 1
+                                }
+                        tasks.append(task)
+                        level += 1
         elif filling_type == 'TO_CENTER_SIDES':
             loops_raw = BmEx.get_verts_loops_from_selection(verts_selection)
             loops = cls.analyze_loops(loops_raw, active_vert)
@@ -287,6 +278,9 @@ class QuadBridge(ABC):
             new_dest_loop.extend(BmEx.create_multiedge(bm, vert1, vert2, cls.dest_loop_verts_number(cls.block_src_verts, level + 1), True)[1:])
         dest_loop.clear()
         dest_loop.extend(new_dest_loop)
+        # add source_loop and dest_loop to grid (horizontal)
+        grid['horizontal'].insert(0, source_loop)
+        grid['horizontal'].append(dest_loop)
         # for item in grid['horizontal']:
         #     print('horizontal', item)
         # for item in grid['vertical']:
