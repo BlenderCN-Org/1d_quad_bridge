@@ -43,11 +43,11 @@ class QuadBridge(ABC):
             filling_type = cls.get_filling_type(bm)
             # print(filling_type)
             for task in cls.tasks_by_filling_type(bm, filling_type):
-                for elem, value in task.items():
-                    print(elem, value)
+                # for elem, value in task.items():
+                #     print(elem, value)
                 if task['levels'] > 0:
                     for level in range(task['levels']):
-                        print('current level: ', level)
+                        # print('current level: ', level)
                         task['source_loop'] = cls.build_level(bm, task['source_loop'],
                                                               task['dest_loop'],
                                                               task['from_side'] if 'from_side' in task else [],
@@ -72,6 +72,9 @@ class QuadBridge(ABC):
                 loops = cls.analyze_loops(loops_raw, active_vert)
                 # print(loops)
                 grid = cls.get_grid(bm, verts_selection, loops['source_loop'], loops['dest_loop'], loops['from_side'], loops['to_side'])
+
+                for intermediate_dest_loop in grid['horizontal']:
+                    pass
 
                 task['source_loop'] = loops['source_loop']
                 if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
@@ -269,14 +272,14 @@ class QuadBridge(ABC):
             if vert not in source_loop and vert not in dest_loop and vert not in from_side and vert not in to_side and vert not in used_verts:
                 verts_to_remove.append(vert)
         BmEx.remove_verts(bm, verts_to_remove)
-        # recreate horizontal loops by levels
+        # recreate horizontal loops by corresponding levels
         level = 0
         for i, loop in enumerate(grid['horizontal']):
             # if i % cls.block_side_edges():
             new_loop = [loop[0]]
             level += 1
             for vert1, vert2 in zip(loop, loop[1:]):
-                new_loop.append(BmEx.create_multiedge(bm, vert1, vert2, cls.dest_loop_verts_number(cls.block_src_verts, level), True)[1:])
+                new_loop.extend(BmEx.create_multiedge(bm, vert1, vert2, cls.dest_loop_verts_number(cls.block_src_verts, level), True)[1:])
             grid['horizontal'][i] = new_loop
         # recreate dest_loop by final level
         new_dest_loop = [dest_loop[0]]
