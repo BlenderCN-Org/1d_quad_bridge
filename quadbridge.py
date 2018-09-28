@@ -39,15 +39,15 @@ class QuadBridge(ABC):
             bm.verts.ensure_lookup_table()
             bm.edges.ensure_lookup_table()
             # if area selected - clear it
-            cls.clear_selection_area(bm)
+            # cls.clear_selection_area(bm)
             filling_type = cls.get_filling_type(bm)
             # print(filling_type)
             for task in cls.tasks_by_filling_type(bm, filling_type):
-                # for elem, value in task.items():
-                #     print(elem, value)
+                for elem, value in task.items():
+                    print(elem, value)
                 if task['levels'] > 0:
                     for level in range(task['levels']):
-                        # print('current level: ', level)
+                        print('current level: ', level)
                         task['source_loop'] = cls.build_level(bm, task['source_loop'],
                                                               task['dest_loop'],
                                                               task['from_side'] if 'from_side' in task else [],
@@ -67,34 +67,29 @@ class QuadBridge(ABC):
         tasks = []
         if filling_type == 'TWO_LOOPS_SIDES_RECREATE_DEST':
             task = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
-            loops = BmEx.get_verts_loops_from_selection(verts_selection)
-            if len(loops) == 4:
-                task['dest_loop'] = [loop for loop in loops if active_vert in loop][0]
-                task['source_loop'] = [loop for loop in loops if task['dest_loop'][0] not in loop and task['dest_loop'][-1] not in loop][0]
-                loops.remove(task['dest_loop'])
-                loops.remove(task['source_loop'])
+            loops_raw = BmEx.get_verts_loops_from_selection(verts_selection)
+            if len(loops_raw) == 4:
+                loops = cls.analyze_loops(loops_raw, active_vert)
+                # print(loops)
+                grid = cls.get_grid(bm, verts_selection, loops['source_loop'], loops['dest_loop'], loops['from_side'], loops['to_side'])
+
+                task['source_loop'] = loops['source_loop']
                 if len(task['source_loop']) >= cls.block_src_verts and (len(task['source_loop']) - 1) % cls.block_src_edges() == 0:
+                    task['dest_loop'] = loops['dest_loop']
+                    task['from_side'] = loops['from_side']
+                    task['to_side'] = loops['to_side']
                     # count levels number
-                    task['levels'] = int((len(loops[0]) - 1) / cls.block_side_edges())
+                    task['levels'] = int((len(task['from_side']) - 1) / cls.block_side_edges())
                     # recreate dest_loop according to levels number
-                    BmEx.remove_verts(bm, task['dest_loop'][1:-1])
-                    task['dest_loop'] = BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']), select=True)
-                    # correct source_loop direction to dest_loop direction
-                    if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
-                        task['source_loop'].reverse()
-                    # get 'from' and 'to' sides
-                    task['from_side'] = [loop for loop in loops if task['dest_loop'][0] in loop and task['source_loop'][0] in loop][0]
-                    task['to_side'] = [loop for loop in loops if task['dest_loop'][-1] in loop and task['source_loop'][-1] in loop][0]
-                    if not task['source_loop'][0] == task['from_side'][0]:
-                        task['from_side'].reverse()
-                    if not task['source_loop'][-1] == task['to_side'][0]:
-                        task['to_side'].reverse()
-                    # additional check from- and to- sides (maybe not needed)
-                    if ((task['source_loop'][0]).co - (task['from_side'][1]).co).length > ((task['source_loop'][0]).co - (task['to_side'][1]).co).length:
-                        task['to_side'], task['from_side'] = task['from_side'], task['to_side']
+                    # BmEx.remove_verts(bm, task['dest_loop'][1:-1])
+                    # task['dest_loop'] = BmEx.create_multiedge(bm, task['dest_loop'][0], task['dest_loop'][-1], cls.dest_loop_verts_number(len(task['source_loop']), task['levels']), select=True)
+                    # # correct source_loop direction to dest_loop direction
+                    # if not BmEx.loops_direction(task['source_loop'], task['dest_loop']):
+                    #     task['source_loop'].reverse()
             tasks.append(task)
         elif filling_type == 'TO_CENTER_SIDES':
-            loops = BmEx.get_verts_loops_from_selection(verts_selection)
+            loops_raw = BmEx.get_verts_loops_from_selection(verts_selection)
+            loops = cls.analyze_loops(loops_raw, active_vert)
             task_l = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
             task_r = {'source_loop': [], 'dest_loop': [], 'from_side': [], 'to_side': [], 'levels': 0}
             if len(loops) == 4:
@@ -177,7 +172,7 @@ class QuadBridge(ABC):
         active_vert = bm.select_history.active
         selection_is_closed_loop = BmEx.selection_is_closed_loop(verts_selection)
         if selection_is_closed_loop:
-            if len(active_vert.link_edges) == 2:
+            if len(active_vert.link_edges) <= 3:
                 # filling between two loops with sides (with deleting dest loop and recreating it with required vertex number)
                 filing_type = 'TWO_LOOPS_SIDES_RECREATE_DEST'
             else:
@@ -187,6 +182,114 @@ class QuadBridge(ABC):
             # filling between two loops without sides
             filing_type = 'TWO_LOOPS'
         return (filing_type)
+
+    @classmethod
+    def analyze_loops(cls, loops_list, active_vert):
+        # analyze loops with direction correction
+        # active_vert sets the direction
+        # print(loops_list)
+        loops = dict(source_loop=[], dest_loop=[], from_side=[], to_side=[])
+        loops['dest_loop'] = [loop for loop in loops_list if active_vert in loop][0]
+        loops_list.remove(loops['dest_loop'])
+        loops['source_loop'] = [loop for loop in loops_list if loops['dest_loop'][0] not in loop and loops['dest_loop'][-1] not in loop][0]
+        loops_list.remove(loops['source_loop'])
+        # correct source and dest loops direction (to one direction)
+        if not BmEx.loops_direction(loops['source_loop'], loops['dest_loop']):
+            loops['source_loop'].reverse()
+        loops['from_side'] = [loop for loop in loops_list if loops['dest_loop'][0] in loop and loops['source_loop'][0] in loop][0]
+        loops['to_side'] = [loop for loop in loops_list if loop != loops['from_side']][0]
+        # correct from- and to- sides direction (from source loop to dest loop)
+        if not loops['source_loop'][0] == loops['from_side'][0]:
+            loops['from_side'].reverse()
+        if not loops['source_loop'][-1] == loops['to_side'][0]:
+            loops['to_side'].reverse()
+        # additional check from- and to- sides (maybe not needed)
+        if ((loops['source_loop'][0]).co - (loops['from_side'][1]).co).length > ((loops['source_loop'][0]).co - (loops['to_side'][1]).co).length:
+            loops['to_side'], loops['from_side'] = loops['from_side'], loops['to_side']
+        return loops
+
+    @classmethod
+    def get_grid(cls, bm, selection, source_loop, dest_loop, from_side, to_side):
+        # return arranged arrays of intermediate dest_loops and to_sides (horizontal and vertical loops) unused edges - deleting
+        # and recreates dest_loop for last level
+        grid = dict(vertical=[], horizontal=[])
+        used_verts = []
+        # horizontal loops
+        for i, vert in enumerate(from_side):
+            if vert not in source_loop and vert not in dest_loop and not i % cls.block_side_edges():
+            # if vert not in source_loop and vert not in dest_loop:
+                current_loop = []
+                current_vert = vert
+                current_loop.append(current_vert)
+                current_edge = [edge for edge in current_vert.link_edges if edge.select and edge.other_vert(current_vert) not in from_side][0]
+                next_vert = current_edge.other_vert(current_vert)
+                if cls.block_src_edges() == 1:
+                    current_loop.append(next_vert)
+                # current_loop.append(next_vert)
+                for i in range(len(source_loop) - 2):
+                    edge_loop = current_edge.link_loops[0] if current_edge.link_loops[0].vert != next_vert else current_edge.link_loops[1]
+                    current_edge = edge_loop.link_loop_next.link_loop_radial_next.link_loop_next.edge
+                    next_vert = current_edge.other_vert(next_vert)
+                    if not i % cls.block_src_edges():
+                        current_loop.append(next_vert)
+                    # current_loop.append(next_vert)
+                grid['horizontal'].append(current_loop)
+                used_verts.extend(current_loop)
+        # vertical loops
+        for i, vert in enumerate(source_loop):
+            if vert not in from_side and vert not in to_side and not i % cls.block_src_edges():
+            # if vert not in from_side and vert not in to_side:
+                current_loop = []
+                current_vert = vert
+                current_loop.append(current_vert)
+                current_edge = [edge for edge in current_vert.link_edges if edge.select and edge.other_vert(current_vert) not in source_loop][0]
+                next_vert = current_edge.other_vert(current_vert)
+                if cls.block_side_edges() == 1:
+                    current_loop.append(next_vert)
+                # current_loop.append(next_vert)
+                for i in range(len(from_side) - 2):
+                    edge_loop = current_edge.link_loops[0] if current_edge.link_loops[0].vert != next_vert else current_edge.link_loops[1]
+                    current_edge = edge_loop.link_loop_next.link_loop_radial_next.link_loop_next.edge
+                    next_vert = current_edge.other_vert(next_vert)
+                    if not i % cls.block_side_edges():
+                        current_loop.append(next_vert)
+                    # current_loop.append(next_vert)
+                grid['vertical'].append(current_loop)
+                used_verts.extend(current_loop)
+        # recreate dest_loop (like horizontal grid) - remove unused verts
+        new_dest_loop = []
+        for i, vert in enumerate(dest_loop):
+            if not i % cls.block_src_edges():
+                new_dest_loop.append(vert)
+        dest_loop.clear()
+        dest_loop.extend(new_dest_loop)
+        # clear unused verts
+        verts_to_remove = []
+        for vert in selection:
+            if vert not in source_loop and vert not in dest_loop and vert not in from_side and vert not in to_side and vert not in used_verts:
+                verts_to_remove.append(vert)
+        BmEx.remove_verts(bm, verts_to_remove)
+        # recreate horizontal loops by levels
+        level = 0
+        for i, loop in enumerate(grid['horizontal']):
+            # if i % cls.block_side_edges():
+            new_loop = [loop[0]]
+            level += 1
+            for vert1, vert2 in zip(loop, loop[1:]):
+                new_loop.append(BmEx.create_multiedge(bm, vert1, vert2, cls.dest_loop_verts_number(cls.block_src_verts, level), True)[1:])
+            grid['horizontal'][i] = new_loop
+        # recreate dest_loop by final level
+        new_dest_loop = [dest_loop[0]]
+        for vert1, vert2 in zip(dest_loop, dest_loop[1:]):
+            new_dest_loop.extend(BmEx.create_multiedge(bm, vert1, vert2, cls.dest_loop_verts_number(cls.block_src_verts, level + 1), True)[1:])
+        dest_loop.clear()
+        dest_loop.extend(new_dest_loop)
+        # for item in grid['horizontal']:
+        #     print('horizontal', item)
+        # for item in grid['vertical']:
+        #     print('vertical', item)
+        # print('dest_loop', dest_loop)
+        return grid
 
     @classmethod
     def levels(cls, src_loop, dest_loop):
@@ -238,6 +341,7 @@ class QuadBridge(ABC):
             level_height = ((from_side[level * cls.block_side_edges() + cls.block_side_verts - 1]).co - (from_side[level * cls.block_side_edges()]).co).length
         steps_on_level = int((len(src_loop) - 1) / cls.block_src_edges())
         for step in range(steps_on_level):
+            print('current step', step)
             step_src_loop = src_loop[step * cls.block_src_edges():step * cls.block_src_edges() + cls.block_src_verts]
             step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
             if step == steps_on_level - 1:
@@ -1182,7 +1286,6 @@ class BmEx:
         # print('extreme verts', extreme_verts)
         for vert in extreme_verts:
             extreme_verts.remove(vert)
-            # for next_vert in [edge.other_vert(vert) for edge in vert.link_edges if edge.select]:
             for edge in [edge for edge in vert.link_edges if edge.select]:
                 if extreme_verts:
                     current_loop = [vert]
@@ -1210,7 +1313,8 @@ class BmEx:
                                     break
                             else:
                                 # continue to next vert
-                                next_edge = [edge for edge in selected_edges if (edge.verts[0] not in current_loop or edge.verts[1] not in current_loop)][0]
+                                next_edge = [edge for edge in selected_edges if __class__.edge_link_faces_selected_number(edge) == 1
+                                             and (edge.verts[0] not in current_loop or edge.verts[1] not in current_loop)][0]
                                 next_vert = next_edge.other_vert(next_vert)
         return loops
 
@@ -1229,7 +1333,7 @@ class BmEx:
     def is_vert_extreme_angle(vert):
         # check if vert is the 90 degree angle extreme
         selected_edges = [edge for edge in vert.link_edges if edge.select]
-        return True if (len(selected_edges) == 2 and (len(vert.link_edges) == 4 or len(vert.link_faces) == 1)) else False
+        return True if (len(selected_edges) == 2 and (len(vert.link_edges) == 4 or len(vert.link_faces) == 2)) else False
 
     @staticmethod
     def loops_direction(loop1, loop2):
@@ -1249,10 +1353,15 @@ class BmEx:
         # check if selection is a closed verts loop
         is_closed_loop = True
         for vert in selection_verts:
-            if len([edge for edge in vert.link_edges if edge.select]) != 2:
+            if len([edge for edge in vert.link_edges if edge.select]) == 1:
                 is_closed_loop = False
                 break
         return is_closed_loop
+
+    @staticmethod
+    def edge_link_faces_selected_number(edge):
+        # returns number of selected liked faces of the edge
+        return len([face for face in edge.link_faces if face.select])
 
     @staticmethod
     def remove_verts(bm, verts_list):
@@ -1270,14 +1379,23 @@ class BmEx:
         next_vert = vert1
         for i in range(verts_count - 2):
             next_vert = bm.verts.new((next_vert.co + direction * length))
-            next_edge = bm.edges.new((loop[-1], next_vert))
+            if not __class__.edge_exists(loop[-1], next_vert):
+                next_edge = bm.edges.new((loop[-1], next_vert))
+                if select:
+                    next_edge.select = True
             loop.append(next_vert)
             if select:
                 next_vert.select = True
-                next_edge.select = True
-        bm.edges.new((loop[-1], vert2))
+        if not __class__.edge_exists(loop[-1], vert2):
+            bm.edges.new((loop[-1], vert2))
         loop.append(vert2)
         return loop
+
+    @staticmethod
+    def edge_exists(vert1, vert2):
+        # return True if edge between vert1 and vert2 exists
+        edge = [edge for edge in vert1.link_edges if edge.other_vert(vert1) == vert2]
+        return True if len(edge) > 0 else False
 
 
 class QuadBridgePanel(bpy.types.Panel):
