@@ -9,6 +9,7 @@
 #   0.2.0. (2018.08.18) - added 3 more bridges types (2-4, 2-2, 1-3)
 #   0.2.1. (2018.08.31) - added 3-7 bridges
 #   0.3.0. (2018.09.04) - improve - add filing closed areas (two types: 1) to center from two sides 2) to dest loop with its recreation)
+#   0.4.0. (2018.09.30) - remake - support source shape geometry
 
 import bpy
 import bmesh
@@ -30,7 +31,7 @@ class QuadBridge(ABC):
     def make_bridge(cls, context):
         # cannot make bridges with not integer power (we can build bridge 2 polygons -> 4 polygons, but could'nt 3 polygons -> 5 polygons, reminder polygons appears)
         if cls.block_dest_edges() % cls.block_src_edges():
-            print('can not use blocks with not integer power ', cls.block_dest_edges() / cls.block_src_edges())
+            print('ERR: Can not use blocks with not integer power ', cls.block_dest_edges() / cls.block_src_edges())
             return
         # for active object
         if context.selected_objects:
@@ -43,8 +44,8 @@ class QuadBridge(ABC):
             filling_type = cls.get_filling_type(bm)
             # print('filling type', filling_type)
             for task in cls.tasks_by_filling_type(bm, filling_type):
-                for elem, value in task.items():
-                    print(elem, value)
+                # for elem, value in task.items():
+                #     print(elem, value)
                 if task['levels'] > 0:
                     for level in range(task['levels']):
                         # print('current level: ', level)
@@ -69,7 +70,11 @@ class QuadBridge(ABC):
             loops_raw = BmEx.get_verts_loops_from_selection(verts_selection)
             if len(loops_raw) == 4:
                 loops = cls.analyze_loops(loops_raw, active_vert)
-                if len(loops['source_loop']) >= cls.block_src_verts and (len(loops['source_loop']) - 1) % cls.block_src_edges() == 0 and (len(loops['from_side']) - 1) % cls.block_side_edges():
+                if len(loops['source_loop']) >= cls.block_src_verts \
+                        and (len(loops['source_loop']) - 1) % cls.block_src_edges() == 0 \
+                        and (len(loops['from_side']) - 1) % cls.block_side_edges() == 0 \
+                        and len(loops['source_loop']) == len(loops['dest_loop']) \
+                        and len(loops['from_side']) == len(loops['to_side']):
                     grid = cls.get_grid(loops['source_loop'], loops['dest_loop'], loops['from_side'], loops['to_side'])
                     # recreate dest_loop (last in horizontal) - remove unused verts
                     new_dest_loop = []
@@ -101,7 +106,11 @@ class QuadBridge(ABC):
             loops_raw = BmEx.get_verts_loops_from_selection(verts_selection)
             if len(loops_raw) == 4:
                 loops = cls.analyze_loops(loops_raw, active_vert)
-                if len(loops['source_loop']) >= cls.block_src_verts and (len(loops['source_loop']) - 1) % cls.block_src_edges() == 0:
+                if len(loops['source_loop']) >= cls.block_src_verts and \
+                        (len(loops['source_loop']) - 1) % cls.block_src_edges() == 0 \
+                        and (len(loops['from_side']) - 1) % cls.block_side_edges() == 0 \
+                        and len(loops['source_loop']) == len(loops['dest_loop']) \
+                        and len(loops['from_side']) == len(loops['to_side']):
                     grid = cls.get_grid(loops['source_loop'], loops['dest_loop'], loops['from_side'], loops['to_side'])
                     # recreate horizontal loops by corresponding levels
                     if len(grid['horizontal']) % 2:
@@ -1330,7 +1339,7 @@ class BmEx:
                                     break
                             else:
                                 # continue to next vert
-                                next_edge = [edge for edge in selected_edges if __class__.edge_link_faces_selected_number(edge) == 1
+                                next_edge = [edge for edge in selected_edges if __class__.edge_link_faces_selected_number(edge) <= 1
                                              and (edge.verts[0] not in current_loop or edge.verts[1] not in current_loop)][0]
                                 next_vert = next_edge.other_vert(next_vert)
         return loops
@@ -1350,7 +1359,7 @@ class BmEx:
     def is_vert_extreme_angle(vert):
         # check if vert is the 90 degree angle extreme
         selected_edges = [edge for edge in vert.link_edges if edge.select]
-        return True if (len(selected_edges) == 2 and (len(vert.link_edges) == 4 or len(vert.link_faces) == 2)) else False
+        return True if (len(selected_edges) == 2 and (len(vert.link_edges) == 4 or len([face for face in vert.link_faces if face.select]) == 1)) else False
 
     @staticmethod
     def loops_direction(loop1, loop2):

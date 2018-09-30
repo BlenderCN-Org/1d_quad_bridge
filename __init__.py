@@ -2,7 +2,7 @@ bl_info = {
     'name': 'Quad Bridge',
     'category': 'Mesh',
     'author': 'Nikita Akimov',
-    'version': (0, 3, 0),
+    'version': (0, 4, 0),
     'blender': (2, 79, 0),
     'location': 'The 3D_View window - T-panel - the 1D tab',
     'wiki_url': 'https://github.com/Korchy/1d_quad_bridge',
