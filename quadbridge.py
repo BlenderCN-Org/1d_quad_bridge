@@ -42,7 +42,7 @@ class QuadBridge(ABC):
             bm.edges.ensure_lookup_table()
             # get filling type
             filling_type = cls.get_filling_type(bm)
-            # print('filling type', filling_type)
+            print('Filling type: ', filling_type)
             for task in cls.tasks_by_filling_type(bm, filling_type):
                 # for elem, value in task.items():
                 #     print(elem, value)
@@ -200,12 +200,13 @@ class QuadBridge(ABC):
             return filing_type
         selection_is_closed_loop = BmEx.selection_is_closed_loop(verts_selection)
         if selection_is_closed_loop:
-            if len(active_vert.link_edges) <= 3:
-                # filling between two loops with sides (with deleting dest loop and recreating it with required vertex number)
-                filing_type = 'TWO_LOOPS_SIDES_RECREATE_DEST'
-            else:
-                # filling to center with sides
-                filing_type = 'TO_CENTER_SIDES'
+            if cls.selection_filled_with_geometry(verts_selection):
+                if len(active_vert.link_edges) <= 3:
+                    # filling from source_loop to dest_loop with recreating dest_loop with sides
+                    filing_type = 'TWO_LOOPS_SIDES_RECREATE_DEST'
+                else:
+                    # filling from source_loop_1 (source_loop) and source_loop_2 (dest_loop) to center with sides
+                    filing_type = 'TO_CENTER_SIDES'
         if not filing_type:
             # filling between two loops without sides
             filing_type = 'TWO_LOOPS'
@@ -245,7 +246,7 @@ class QuadBridge(ABC):
         used_verts = []
         # horizontal loops
         for i, vert in enumerate(from_side):
-            if vert not in source_loop and vert not in dest_loop and not i % cls.block_side_edges():
+            if vert not in source_loop and vert not in dest_loop and not i % cls.block_side_edges() and len([edge for edge in vert.link_edges if edge.select]) > 2:
             # if vert not in source_loop and vert not in dest_loop:
                 current_loop = []
                 current_vert = vert
@@ -266,7 +267,7 @@ class QuadBridge(ABC):
                 used_verts.extend(current_loop)
         # vertical loops
         for i, vert in enumerate(source_loop):
-            if vert not in from_side and vert not in to_side and not i % cls.block_src_edges():
+            if vert not in from_side and vert not in to_side and not i % cls.block_src_edges() and len([edge for edge in vert.link_edges if edge.select]) > 2:
             # if vert not in from_side and vert not in to_side:
                 current_loop = []
                 current_vert = vert
@@ -372,7 +373,8 @@ class QuadBridge(ABC):
             step_dest_loop = dest_loop[step * int((len(dest_loop) - 1) / steps_on_level):step * int((len(dest_loop) - 1) / steps_on_level) + int((len(dest_loop) - 1) / steps_on_level) + 1]
             if step == steps_on_level - 1:
                 next_block = first_last_block
-            prev_block = cls.block(step_src_loop, step_dest_loop, prev_block, next_block, level_height, level, levels)
+            # prev_block = cls.block(step_src_loop, step_dest_loop, prev_block, next_block, level_height, level, levels)
+            prev_block = cls.block(step_src_loop, step_dest_loop, prev_block, next_block, None, level, levels)
             # verts to BMVert
             for i, vert in enumerate(prev_block):
                 if vert:
@@ -422,6 +424,14 @@ class QuadBridge(ABC):
     @classmethod
     def dest_loop_verts_number(cls, source_loop_verts_number, levels):
         return (source_loop_verts_number - 1) * cls.block_level_power() ** levels + 1
+
+    @classmethod
+    def selection_filled_with_geometry(cls, verts_selection):
+        # return True if selection is filled by grid
+        for vert in verts_selection:
+            if len(vert.link_faces) == 4:
+                return True
+        return False
 
 
 class QuadBirdge_3_5(QuadBridge):
