@@ -10,6 +10,7 @@
 #   0.2.1. (2018.08.31) - added 3-7 bridges
 #   0.3.0. (2018.09.04) - improve - add filing closed areas (two types: 1) to center from two sides 2) to dest loop with its recreation)
 #   0.4.0. (2018.09.30) - remake - support source shape geometry
+#   0.4.1. (2018.10.01) - improve - added label to show last selection size
 
 import bpy
 import bmesh
@@ -19,6 +20,10 @@ import math
 import os
 from inspect import getsourcefile
 from abc import ABC, abstractmethod
+
+
+class QuadBridgeVars():
+    last_selection_size = None
 
 
 class QuadBridge(ABC):
@@ -235,6 +240,11 @@ class QuadBridge(ABC):
         # # additional check from- and to- sides (maybe not needed)
         # if ((loops['source_loop'][0]).co - (loops['from_side'][1]).co).length > ((loops['source_loop'][0]).co - (loops['to_side'][1]).co).length:
         #     loops['to_side'], loops['from_side'] = loops['from_side'], loops['to_side']
+        # print selection size
+        selection_size = str(len(loops['source_loop']) - 1) + ' x ' + str(len(loops['from_side']) - 1)
+        print(selection_size)
+        QuadBridgeVars.last_selection_size = selection_size
+        # cls.report({'INFO'}, len(loops['source_loop']) + ' x ' + len(loops['from_side']))
         return loops
 
     @classmethod
@@ -1443,6 +1453,8 @@ class QuadBridgePanel(bpy.types.Panel):
 
     def draw(self, context):
         self.layout.template_icon_view(context.window_manager.quadbridge_previews, 'items', show_labels=True)
+        self.layout.label('Last selection size:')
+        self.layout.label(str(QuadBridgeVars.last_selection_size) if QuadBridgeVars.last_selection_size is not None else '')
 
 
 class QuadBridgeOp(bpy.types.Operator):
