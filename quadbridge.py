@@ -11,6 +11,7 @@
 #   0.3.0. (2018.09.04) - improve - add filing closed areas (two types: 1) to center from two sides 2) to dest loop with its recreation)
 #   0.4.0. (2018.09.30) - remake - support source shape geometry
 #   0.4.1. (2018.10.01) - improve - added label to show last selection size
+#   0.5.0. (2018.11.06) - improve - added scheme 1-3 (1 vert level)
 
 import bpy
 import bmesh
@@ -22,7 +23,7 @@ from inspect import getsourcefile
 from abc import ABC, abstractmethod
 
 
-class QuadBridgeVars():
+class QuadBridgeVars:
     last_selection_size = None
 
 
@@ -308,7 +309,7 @@ class QuadBridge(ABC):
         return grid
 
     @classmethod
-    def remove_unused_verts(cls, bm, selection , grid, from_side, to_side):
+    def remove_unused_verts(cls, bm, selection, grid, from_side, to_side):
         # remove verts from selection if not in grid
         # from_side and to_side do not included in grid - additional check
         verts_to_remove = []
@@ -1307,6 +1308,372 @@ class QuadBirdge_3_7(QuadBridge):
             return v1 + direction * length
 
 
+class QuadBirdge_2_4_l1(QuadBridge):
+
+    block_src_verts = 2
+    block_dest_verts = 4
+    block_side_verts = 2
+
+    @classmethod
+    def fillBlock(cls, bm, block_verts):
+        # BMFaces from BMVerts
+        bm.faces.new([block_verts[0], block_verts[2], block_verts[3], block_verts[4]])
+        bm.faces.new([block_verts[0], block_verts[4], block_verts[5], block_verts[1]])
+        # returns sorted(!) top line of the block
+        return [block_verts[2], block_verts[3], block_verts[4], block_verts[5]]
+
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, next_block, height, level, levels):
+        return [__class__.v0(src_loop),
+                __class__.v1(src_loop),
+                __class__.v2(src_loop, dest_loop, prev_block, height, level, levels),
+                __class__.v3(src_loop, dest_loop, height, level, levels),
+                __class__.v4(src_loop, dest_loop, height, level, levels),
+                __class__.v5(src_loop, dest_loop, next_block, height, level, levels)
+                ]
+
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [to_side[0],
+                from_side[0],
+                to_side[1],
+                None,
+                None,
+                from_side[1]
+                ]
+
+    @staticmethod
+    def v0(src_loop):
+        return src_loop[0]
+
+    @staticmethod
+    def v1(src_loop):
+        return src_loop[1]
+
+    @staticmethod
+    def v2(src_loop, dest_loop, prev_block, height, level, levels):
+        if prev_block:
+            return prev_block[5]
+        elif level == levels - 1:
+            return dest_loop[0]
+        else:
+            v1 = src_loop[0].co
+            v2 = dest_loop[0].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v3(src_loop, dest_loop, height, level, levels):
+        if level == levels - 1:
+            return dest_loop[1]
+        else:
+            v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) * 1 / 3
+            v2 = dest_loop[int((len(dest_loop) - 1) * 1 / 3)].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v4(src_loop, dest_loop, height, level, levels):
+        if level == levels - 1:
+            return dest_loop[2]
+        else:
+            v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) * 2 / 3
+            v2 = dest_loop[int((len(dest_loop) - 1) * 2 / 3)].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v5(src_loop, dest_loop, next_block, height, level, levels):
+        if next_block:
+            return next_block[2]
+        elif level == levels - 1:
+            return dest_loop[3]
+        else:
+            v1 = src_loop[1].co
+            v2 = dest_loop[-1].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+
+class QuadBirdge_3_5_l1(QuadBridge):
+
+    block_src_verts = 3
+    block_dest_verts = 5
+    block_side_verts = 2
+
+    @classmethod
+    def fillBlock(cls, bm, block_verts):
+        # BMFaces from BMVerts
+        bm.faces.new([block_verts[0], block_verts[3], block_verts[4], block_verts[1]])
+        bm.faces.new([block_verts[1], block_verts[4], block_verts[5], block_verts[2]])
+        bm.faces.new([block_verts[0], block_verts[6], block_verts[7], block_verts[3]])
+        bm.faces.new([block_verts[3], block_verts[7], block_verts[8], block_verts[4]])
+        bm.faces.new([block_verts[4], block_verts[8], block_verts[9], block_verts[5]])
+        bm.faces.new([block_verts[5], block_verts[9], block_verts[10], block_verts[2]])
+        # returns sorted(!) top line of the block
+        return [block_verts[6], block_verts[7], block_verts[8], block_verts[9], block_verts[10]]
+
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, next_block, height, level, levels):
+        return [__class__.v0(src_loop),
+                __class__.v1(src_loop),
+                __class__.v2(src_loop, next_block),
+                __class__.v3(src_loop, dest_loop, height, level, levels),
+                __class__.v4(src_loop, dest_loop, height, level, levels),
+                __class__.v5(src_loop, dest_loop, height, level, levels),
+                __class__.v6(src_loop, dest_loop, prev_block, height, level, levels),
+                __class__.v7(src_loop, dest_loop, height, level, levels),
+                __class__.v8(src_loop, dest_loop, height, level, levels),
+                __class__.v9(src_loop, dest_loop, height, level, levels),
+                __class__.v10(src_loop, dest_loop, next_block, height, level, levels)
+                ]
+
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [to_side[0],
+                None,
+                from_side[0],
+                None,
+                None,
+                None,
+                to_side[1],
+                None,
+                None,
+                None,
+                from_side[1]
+                ]
+
+    @staticmethod
+    def v0(src_loop):
+        return src_loop[0]
+
+    @staticmethod
+    def v1(src_loop):
+        return src_loop[1]
+
+    @staticmethod
+    def v2(src_loop, next_block):
+        return src_loop[2]
+
+    @staticmethod
+    def v3(src_loop, dest_loop, height, level, levels):
+        v1 = src_loop[0].co + (src_loop[2].co - src_loop[0].co) * 1 / 4
+        v2 = dest_loop[int((len(dest_loop) - 1) * 1 / 4)].co
+        direction = v2 - v1
+        direction.normalize()
+        length = (height if height else __class__.level_height(v1, v2, level, levels)) * 1 / 2
+        return v1 + direction * length
+
+    @staticmethod
+    def v4(src_loop, dest_loop, height, level, levels):
+        v1 = src_loop[1].co
+        v2 = dest_loop[int((len(dest_loop) - 1) / 2)].co
+        direction = v2 - v1
+        direction.normalize()
+        length = (height if height else __class__.level_height(v1, v2, level, levels)) * 1 / 2
+        return v1 + direction * length
+
+    @staticmethod
+    def v5(src_loop, dest_loop, height, level, levels):
+        v1 = src_loop[0].co + (src_loop[2].co - src_loop[0].co) * 3 / 4
+        v2 = dest_loop[int((len(dest_loop) - 1) * 3 / 4)].co
+        direction = v2 - v1
+        direction.normalize()
+        length = (height if height else __class__.level_height(v1, v2, level, levels)) * 1 / 2
+        return v1 + direction * length
+
+    @staticmethod
+    def v6(src_loop, dest_loop, prev_block, height, level, levels):
+        if prev_block:
+            return prev_block[10]
+        elif level == levels - 1:
+            return dest_loop[0]
+        else:
+            v1 = src_loop[0].co
+            v2 = dest_loop[0].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v7(src_loop, dest_loop, height, level, levels):
+        if level == levels - 1:
+            return dest_loop[1]
+        else:
+            v1 = src_loop[0].co + (src_loop[2].co - src_loop[0].co) * 1 / 4
+            v2 = dest_loop[int((len(dest_loop) - 1) * 1 / 4)].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v8(src_loop, dest_loop, height, level, levels):
+        if level == levels - 1:
+            return dest_loop[2]
+        else:
+            v1 = src_loop[1].co
+            v2 = dest_loop[int((len(dest_loop) - 1) / 2)].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v9(src_loop, dest_loop, height, level, levels):
+        if level == levels - 1:
+            return dest_loop[3]
+        else:
+            v1 = src_loop[0].co + (src_loop[2].co - src_loop[0].co) * 3 / 4
+            v2 = dest_loop[int((len(dest_loop) - 1) * 3 / 4)].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v10(src_loop, dest_loop, next_block, height, level, levels):
+        if next_block:
+            return next_block[6]
+        elif level == levels - 1:
+            return dest_loop[4]
+        else:
+            v1 = src_loop[2].co
+            v2 = dest_loop[len(dest_loop) - 1].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+
+class QuadBirdge_2_4_1_l1(QuadBridge):
+
+    block_src_verts = 2
+    block_dest_verts = 4
+    block_side_verts = 2
+
+    @classmethod
+    def fillBlock(cls, bm, block_verts):
+        # BMFaces from BMVerts
+        bm.faces.new([block_verts[0], block_verts[2], block_verts[3], block_verts[1]])
+        bm.faces.new([block_verts[0], block_verts[4], block_verts[5], block_verts[2]])
+        bm.faces.new([block_verts[2], block_verts[5], block_verts[6], block_verts[3]])
+        bm.faces.new([block_verts[3], block_verts[6], block_verts[7], block_verts[1]])
+        # returns sorted(!) top line of the block
+        return [block_verts[4], block_verts[5], block_verts[6], block_verts[7]]
+
+    @classmethod
+    def block(cls, src_loop, dest_loop, prev_block, next_block, height, level, levels):
+        return [__class__.v0(src_loop),
+                __class__.v1(src_loop, next_block),
+                __class__.v2(src_loop, dest_loop, height, level, levels),
+                __class__.v3(src_loop, dest_loop, height, level, levels),
+                __class__.v4(src_loop, dest_loop, prev_block, height, level, levels),
+                __class__.v5(src_loop, dest_loop, height, level, levels),
+                __class__.v6(src_loop, dest_loop, height, level, levels),
+                __class__.v7(src_loop, dest_loop, next_block, height, level, levels)
+                ]
+
+    @classmethod
+    def block_data_from_sides(cls, from_side, to_side):
+        return [to_side[0],
+                from_side[0],
+                None,
+                None,
+                to_side[1],
+                None,
+                None,
+                from_side[1]
+                ]
+
+    @staticmethod
+    def v0(src_loop):
+        return src_loop[0]
+
+    @staticmethod
+    def v1(src_loop, next_block):
+        return src_loop[1]
+
+    @staticmethod
+    def v2(src_loop, dest_loop, height, level, levels):
+        v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) * 1 / 3
+        v2 = dest_loop[int((len(dest_loop) - 1) * 1 / 3)].co
+        direction = v2 - v1
+        direction.normalize()
+        length = (height if height else __class__.level_height(v1, v2, level, levels)) * 1 / 2
+        return v1 + direction * length
+
+    @staticmethod
+    def v3(src_loop, dest_loop, height, level, levels):
+        v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) * 2 / 3
+        v2 = dest_loop[int((len(dest_loop) - 1) * 2 / 3)].co
+        direction = v2 - v1
+        direction.normalize()
+        length = (height if height else __class__.level_height(v1, v2, level, levels)) * 1 / 2
+        return v1 + direction * length
+
+    @staticmethod
+    def v4(src_loop, dest_loop, prev_block, height, level, levels):
+        if prev_block:
+            return prev_block[7]
+        elif level == levels - 1:
+            return dest_loop[0]
+        else:
+            v1 = src_loop[0].co
+            v2 = dest_loop[0].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v5(src_loop, dest_loop, height, level, levels):
+        if level == levels - 1:
+            return dest_loop[1]
+        else:
+            v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) * 1 / 3
+            v2 = dest_loop[int((len(dest_loop) - 1) * 1 / 3)].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v6(src_loop, dest_loop, height, level, levels):
+        if level == levels - 1:
+            return dest_loop[2]
+        else:
+            v1 = src_loop[0].co + (src_loop[1].co - src_loop[0].co) * 2 / 3
+            v2 = dest_loop[int((len(dest_loop) - 1) * 2 / 3)].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+    @staticmethod
+    def v7(src_loop, dest_loop, next_block, height, level, levels):
+        if next_block:
+            return next_block[4]
+        elif level == levels - 1:
+            return dest_loop[3]
+        else:
+            v1 = src_loop[1].co
+            v2 = dest_loop[len(dest_loop) - 1].co
+            direction = v2 - v1
+            direction.normalize()
+            length = height if height else __class__.level_height(v1, v2, level, levels)
+            return v1 + direction * length
+
+
 class QuadBridges:
 
     # add new Bridge class here to make new preview in the menu
@@ -1315,6 +1682,9 @@ class QuadBridges:
                ['2-2', 'b02.jpg', QuadBirdge_2_2],
                ['1-3 (3-5)', 'b03.jpg', QuadBirdge_1_3],
                ['3-7', 'b04.jpg', QuadBirdge_3_7],
+               ['2-4 (lv 1)', 'b05.jpg', QuadBirdge_2_4_l1],
+               ['3-5 (lv 1)', 'b06.jpg', QuadBirdge_3_5_l1],
+               ['2-4 1 (lv 1)', 'b07.jpg', QuadBirdge_2_4_1_l1]
                ]
 
     @staticmethod
@@ -1435,6 +1805,10 @@ class BmEx:
         if not __class__.edge_exists(loop[-1], vert2):
             bm.edges.new((loop[-1], vert2))
         loop.append(vert2)
+        # if edge between vert1 and vert2 exists - remove it
+        edge = [edge for edge in vert1.link_edges if edge.other_vert(vert1) == vert2]
+        if edge:
+            bm.edges.remove(edge[0])
         return loop
 
     @staticmethod
