@@ -12,10 +12,13 @@
 #   0.4.0. (2018.09.30) - remake - support source shape geometry
 #   0.4.1. (2018.10.01) - improve - added label to show last selection size
 #   0.5.0. (2018.11.06) - improve - added scheme 1-3 (1 vert level)
+#   0.5.1. (2018.11.13) - improve - added selection variants showing
 
 import bpy
 import bmesh
 import bpy.utils.previews
+from bpy.props import IntProperty
+from bpy.types import PropertyGroup, WindowManager, Operator
 import copy
 import math
 import os
@@ -25,6 +28,10 @@ from abc import ABC, abstractmethod
 
 class QuadBridgeVars:
     last_selection_size = None
+    selection_variants_source_plus = None
+    selection_variants_source_minus = None
+    selection_variants_dest_plus = None
+    selection_variants_dest_minus = None
 
 
 class QuadBridge(ABC):
@@ -177,6 +184,9 @@ class QuadBridge(ABC):
                     # count levels
                     src_edges = len(task['source_loop']) - 1
                     dest_edges = len(task['dest_loop']) - 1
+                    # print selection size
+                    cls.show_selection_variants(source_loop=task['source_loop'], dest_loop=task['dest_loop'])
+                    # count levels
                     if cls.block_level_power() == 1:
                         task['levels'] = 1
                     elif cls.block_level_power() > 1:
@@ -242,10 +252,7 @@ class QuadBridge(ABC):
         # if ((loops['source_loop'][0]).co - (loops['from_side'][1]).co).length > ((loops['source_loop'][0]).co - (loops['to_side'][1]).co).length:
         #     loops['to_side'], loops['from_side'] = loops['from_side'], loops['to_side']
         # print selection size
-        selection_size = str(len(loops['source_loop']) - 1) + ' x ' + str(len(loops['from_side']) - 1)
-        print(selection_size)
-        QuadBridgeVars.last_selection_size = selection_size
-        # cls.report({'INFO'}, len(loops['source_loop']) + ' x ' + len(loops['from_side']))
+        cls.show_selection_variants(source_loop=loops['source_loop'], dest_loop=loops['dest_loop'], from_side=loops['from_side'])
         return loops
 
     @classmethod
@@ -443,6 +450,66 @@ class QuadBridge(ABC):
             if len(vert.link_faces) == 4:
                 return True
         return False
+
+    @classmethod
+    def show_selection_variants(cls, source_loop=None, dest_loop=None, from_side=None, to_side=None):
+        # print selection size and variants
+        src_edges = len(source_loop) - 1
+        dest_edges = len(dest_loop) - 1
+        if from_side or to_side:
+            # quad selection
+            if to_side and not from_side:
+                from_side = to_side
+            selection_size = str(src_edges) + ' x ' + str(len(from_side) - 1)
+        else:
+            # 2 separate loops selection
+            selection_size = str(src_edges) + ' x ' + str(dest_edges)
+        # last selection size
+        print(selection_size)
+        QuadBridgeVars.last_selection_size = selection_size
+        # cls.report({'INFO'}, selection_size)
+        # selection variants - for source
+        QuadBridgeVars.selection_variants_source_plus = None
+        QuadBridgeVars.selection_variants_source_minus = None
+        if dest_edges % cls.block_dest_edges() == 0:
+            # source_plus
+            level = 0
+            tmp_src_edges = dest_edges / cls.block_level_power()
+            while src_edges < tmp_src_edges:
+                if tmp_src_edges % cls.block_src_edges() == 0:
+                    level += 1
+                    QuadBridgeVars.selection_variants_source_plus = '[' + str(int(tmp_src_edges)) + '] x ' + str(dest_edges) + ' = ' + str(level)
+                    tmp_src_edges = tmp_src_edges / cls.block_level_power()
+                else:
+                    break
+            # source_minus
+            level = 1
+            tmp_src_edges = dest_edges / cls.block_level_power()
+            while src_edges <= tmp_src_edges:
+                tmp_src_edges = tmp_src_edges / cls.block_level_power()
+                level += 1
+                if tmp_src_edges % cls.block_src_edges() == 0:
+                    QuadBridgeVars.selection_variants_source_minus = '[' + str(int(tmp_src_edges)) + '] x ' + str(dest_edges) + ' = ' + str(level)
+                else:
+                    break
+        # selection variants - for dest
+        QuadBridgeVars.selection_variants_dest_plus = None
+        QuadBridgeVars.selection_variants_dest_minus = None
+        if src_edges % cls.block_src_edges() == 0:
+            # # dest_plus
+            level = 1
+            tmp_dest_edges = src_edges * cls.block_level_power()
+            while dest_edges >= tmp_dest_edges:
+                tmp_dest_edges = tmp_dest_edges * cls.block_level_power()
+                level += 1
+                QuadBridgeVars.selection_variants_dest_plus = str(src_edges) + ' x [' + str(int(tmp_dest_edges)) + '] = ' + str(level)
+            # dest_minus
+            level = 0
+            tmp_dest_edges = src_edges * cls.block_level_power()
+            while dest_edges > tmp_dest_edges:
+                level += 1
+                QuadBridgeVars.selection_variants_dest_minus = str(src_edges) + ' x [' + str(int(tmp_dest_edges)) + '] = ' + str(level)
+                tmp_dest_edges = tmp_dest_edges * cls.block_level_power()
 
 
 class QuadBirdge_3_5(QuadBridge):
@@ -1829,14 +1896,27 @@ class QuadBridgePanel(bpy.types.Panel):
         self.layout.template_icon_view(context.window_manager.quadbridge_previews, 'items', show_labels=True)
         self.layout.label('Last selection size:')
         self.layout.label(str(QuadBridgeVars.last_selection_size) if QuadBridgeVars.last_selection_size is not None else '')
+        if QuadBridgeVars.selection_variants_source_plus \
+                or QuadBridgeVars.selection_variants_source_minus \
+                or QuadBridgeVars.selection_variants_dest_plus \
+                or QuadBridgeVars.selection_variants_dest_minus:
+            self.layout.label('Selection variants:')
+            if QuadBridgeVars.selection_variants_source_plus:
+                self.layout.label(QuadBridgeVars.selection_variants_source_plus)
+            if QuadBridgeVars.selection_variants_source_minus:
+                self.layout.label(QuadBridgeVars.selection_variants_source_minus)
+            if QuadBridgeVars.selection_variants_dest_plus:
+                self.layout.label(QuadBridgeVars.selection_variants_dest_plus)
+            if QuadBridgeVars.selection_variants_dest_minus:
+                self.layout.label(QuadBridgeVars.selection_variants_dest_minus)
 
 
-class QuadBridgeOp(bpy.types.Operator):
+class QuadBridgeOp(Operator):
     bl_idname = 'quadbridge.start'
     bl_label = 'Make Bridge 2-4'
     bl_options = {'REGISTER', 'UNDO'}
 
-    bridge_id = bpy.props.IntProperty(
+    bridge_id = IntProperty(
         name='BridgeId',
         default=0
     )
@@ -1886,7 +1966,7 @@ class QuadBridgePreviews:
         bpy.ops.ed.undo_push()
 
 
-class QuadBridgePreviewsItems(bpy.types.PropertyGroup):
+class QuadBridgePreviewsItems(PropertyGroup):
     items = bpy.props.EnumProperty(
         items=lambda self, context: QuadBridgePreviews.get_previews(self, context),
         update=lambda self, context: QuadBridgePreviews.on_preview_select(self, context)
@@ -1898,11 +1978,11 @@ def register():
     bpy.utils.register_class(QuadBridgePanel)
     QuadBridgePreviews.register()
     bpy.utils.register_class(QuadBridgePreviewsItems)
-    bpy.types.WindowManager.quadbridge_previews = bpy.props.PointerProperty(type=QuadBridgePreviewsItems)
+    WindowManager.quadbridge_previews = bpy.props.PointerProperty(type=QuadBridgePreviewsItems)
 
 
 def unregister():
-    del bpy.types.WindowManager.quadbridge_previews
+    del WindowManager.quadbridge_previews
     QuadBridgePreviews.unregister()
     bpy.utils.unregister_class(QuadBridgePreviewsItems)
     bpy.utils.unregister_class(QuadBridgePanel)
