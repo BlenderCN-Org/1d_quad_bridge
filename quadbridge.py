@@ -1749,11 +1749,11 @@ class QuadBridges:
         ['2-4 A', 'b06.jpg', QuadBirdge_3_5_l1],
         ['2-4 C', 'b00.jpg', QuadBirdge_3_5],
         ['2-4 D', 'b03.jpg', QuadBirdge_1_3],
-        ['2-2', 'b02.jpg', QuadBirdge_2_2],
+        ['1-1', 'b02.jpg', QuadBirdge_2_2],
         ['1-3 A', 'b07.jpg', QuadBirdge_2_4_1_l1],
         ['1-3 B', 'b05.jpg', QuadBirdge_2_4_l1],
         ['1-3 C', 'b01.jpg', QuadBirdge_2_4],
-        ['1-3 D', 'b04.jpg', QuadBirdge_3_7]
+        ['2-6', 'b04.jpg', QuadBirdge_3_7]
     ]
 
     @staticmethod
