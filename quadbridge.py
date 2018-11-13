@@ -469,47 +469,48 @@ class QuadBridge(ABC):
         QuadBridgeVars.last_selection_size = selection_size
         # cls.report({'INFO'}, selection_size)
         # selection variants - for source
-        QuadBridgeVars.selection_variants_source_plus = None
-        QuadBridgeVars.selection_variants_source_minus = None
-        if dest_edges % cls.block_dest_edges() == 0:
-            # source_plus
-            level = 0
-            tmp_src_edges = dest_edges / cls.block_level_power()
-            while src_edges < tmp_src_edges:
-                if tmp_src_edges % cls.block_src_edges() == 0:
-                    level += 1
-                    QuadBridgeVars.selection_variants_source_plus = '[' + str(int(tmp_src_edges)) + '] x ' + str(dest_edges) + ' = ' + str(level)
+        if cls.block_level_power() != 1:
+            QuadBridgeVars.selection_variants_source_plus = None
+            QuadBridgeVars.selection_variants_source_minus = None
+            if dest_edges % cls.block_dest_edges() == 0:
+                # source_plus
+                level = 0
+                tmp_src_edges = dest_edges / cls.block_level_power()
+                while src_edges < tmp_src_edges:
+                    if tmp_src_edges % cls.block_src_edges() == 0:
+                        level += 1
+                        QuadBridgeVars.selection_variants_source_plus = '[' + str(int(tmp_src_edges)) + '] x ' + str(dest_edges) + ' = ' + str(level)
+                        tmp_src_edges = tmp_src_edges / cls.block_level_power()
+                    else:
+                        break
+                # source_minus
+                level = 1
+                tmp_src_edges = dest_edges / cls.block_level_power()
+                while src_edges <= tmp_src_edges:
                     tmp_src_edges = tmp_src_edges / cls.block_level_power()
-                else:
-                    break
-            # source_minus
-            level = 1
-            tmp_src_edges = dest_edges / cls.block_level_power()
-            while src_edges <= tmp_src_edges:
-                tmp_src_edges = tmp_src_edges / cls.block_level_power()
-                level += 1
-                if tmp_src_edges % cls.block_src_edges() == 0:
-                    QuadBridgeVars.selection_variants_source_minus = '[' + str(int(tmp_src_edges)) + '] x ' + str(dest_edges) + ' = ' + str(level)
-                else:
-                    break
-        # selection variants - for dest
-        QuadBridgeVars.selection_variants_dest_plus = None
-        QuadBridgeVars.selection_variants_dest_minus = None
-        if src_edges % cls.block_src_edges() == 0:
-            # # dest_plus
-            level = 1
-            tmp_dest_edges = src_edges * cls.block_level_power()
-            while dest_edges >= tmp_dest_edges:
-                tmp_dest_edges = tmp_dest_edges * cls.block_level_power()
-                level += 1
-                QuadBridgeVars.selection_variants_dest_plus = str(src_edges) + ' x [' + str(int(tmp_dest_edges)) + '] = ' + str(level)
-            # dest_minus
-            level = 0
-            tmp_dest_edges = src_edges * cls.block_level_power()
-            while dest_edges > tmp_dest_edges:
-                level += 1
-                QuadBridgeVars.selection_variants_dest_minus = str(src_edges) + ' x [' + str(int(tmp_dest_edges)) + '] = ' + str(level)
-                tmp_dest_edges = tmp_dest_edges * cls.block_level_power()
+                    level += 1
+                    if tmp_src_edges % cls.block_src_edges() == 0:
+                        QuadBridgeVars.selection_variants_source_minus = '[' + str(int(tmp_src_edges)) + '] x ' + str(dest_edges) + ' = ' + str(level)
+                    else:
+                        break
+            # selection variants - for dest
+            QuadBridgeVars.selection_variants_dest_plus = None
+            QuadBridgeVars.selection_variants_dest_minus = None
+            if src_edges % cls.block_src_edges() == 0:
+                # # dest_plus
+                level = 1
+                tmp_dest_edges = src_edges * cls.block_level_power()
+                while dest_edges >= tmp_dest_edges:
+                    tmp_dest_edges = tmp_dest_edges * cls.block_level_power()
+                    level += 1
+                    QuadBridgeVars.selection_variants_dest_plus = str(src_edges) + ' x [' + str(int(tmp_dest_edges)) + '] = ' + str(level)
+                # dest_minus
+                level = 0
+                tmp_dest_edges = src_edges * cls.block_level_power()
+                while dest_edges > tmp_dest_edges:
+                    level += 1
+                    QuadBridgeVars.selection_variants_dest_minus = str(src_edges) + ' x [' + str(int(tmp_dest_edges)) + '] = ' + str(level)
+                    tmp_dest_edges = tmp_dest_edges * cls.block_level_power()
 
 
 class QuadBirdge_3_5(QuadBridge):
